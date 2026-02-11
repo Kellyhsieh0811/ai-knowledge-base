@@ -1,0 +1,1963 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 知識庫 - 從RSS抓取文章，AI智能重製為社群內容</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0d9488;
+            --primary-dark: #0f766e;
+            --primary-light: #5eead4;
+            --bg-gradient-from: #f9fafb;
+            --bg-gradient-to: #e5e7eb;
+            --bg-white: #ffffff;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border: #e5e7eb;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(to bottom right, var(--bg-gradient-from), var(--bg-gradient-to));
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        /* Header */
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .header-icon {
+            width: 2rem;
+            height: 2rem;
+            color: var(--primary);
+        }
+
+        .header-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        /* RSS Section */
+        .rss-section {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+        }
+
+        .rss-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .rss-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-subtitle {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .quick-sources {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .source-chip {
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .source-chip:hover {
+            border-color: var(--primary);
+            background: #f0fdfa;
+        }
+
+        .source-chip.active {
+            background: #f0fdfa;
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .added-feeds {
+            margin-top: 1.5rem;
+        }
+
+        .feed-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .feed-info {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .feed-name {
+            font-weight: 600;
+            min-width: 150px;
+        }
+
+        .feed-url {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-outline {
+            background: white;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-outline:hover {
+            background: #f0fdfa;
+            transform: translateY(-1px);
+        }
+
+        .btn-outline:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #f3f4f6;
+            border-color: #d1d5db;
+            color: #9ca3af;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+        .btn-ghost:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .btn-sm {
+            padding: 0.375rem 0.875rem;
+            font-size: 0.8125rem;
+        }
+
+        .btn-dashed {
+            width: 100%;
+            padding: 1rem;
+            background: white;
+            border: 2px dashed var(--border);
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        .btn-dashed:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #f0fdfa;
+        }
+
+        /* Search & Filter Bar */
+        .search-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .search-wrapper {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.625rem 1rem 0.625rem 2.5rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9375rem;
+            background: white;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .select {
+            padding: 0.625rem 2rem 0.625rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 0.875rem;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.25rem;
+        }
+
+        /* RSS Chips Styles */
+        .quick-sources,
+        .added-sources {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .source-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1rem;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .source-chip:hover {
+            border-color: #0d9488;
+            background: #f0fdfa;
+        }
+
+        .source-chip.active {
+            background: #f0fdfa;
+            border-color: #0d9488;
+            color: #0d9488;
+        }
+
+        .source-chip .delete-btn {
+            margin-left: 0.5rem;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #9ca3af;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .source-chip .delete-btn:hover {
+            color: #ef4444;
+        }
+
+        /* Stats & Tabs */
+        .stats-tabs {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .stats-count {
+            color: var(--text-secondary);
+        }
+
+        .tabs {
+            display: inline-flex;
+            background: #f3f4f6;
+            border-radius: 8px;
+            padding: 0.25rem;
+        }
+
+        .tab {
+            padding: 0.375rem 0.875rem;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.8125rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: white;
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Articles Grid */
+        .articles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1rem;
+        }
+
+        .article-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .article-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .article-logo-container {
+            width: 100%;
+            height: 160px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .source-logo {
+            max-width: 180px;
+            max-height: 100px;
+            object-fit: contain;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            /* Ensure logo is crisp */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+
+        .logo-placeholder {
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: white;
+        }
+
+        .article-content {
+            padding: 1.25rem;
+        }
+
+        .article-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.875rem;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .badge-source {
+            background: #fff7ed;
+            color: #ea580c;
+        }
+
+        .badge-source.josh {
+            background: #f3e8ff;
+            color: #9333ea;
+        }
+
+        .badge-source.deloitte {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .badge-source.mit {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .badge-status {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-status.processed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-status.published {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .article-title {
+            font-size: 1.0625rem;
+            font-weight: 700;
+            line-height: 1.4;
+            margin-bottom: 0.625rem;
+            color: var(--text-primary);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .article-excerpt {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 0.875rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            margin-bottom: 0.875rem;
+        }
+
+        .article-keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+            margin-bottom: 0.875rem;
+        }
+
+        .keyword-tag {
+            padding: 0.25rem 0.625rem;
+            background: #f0fdfa;
+            color: var(--primary-dark);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid #ccfbf1;
+        }
+
+        .keyword-count {
+            padding: 0.25rem 0.625rem;
+            background: #f3f4f6;
+            color: var(--text-secondary);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .article-actions {
+            display: flex;
+            gap: 0.5rem;
+            padding-top: 0.875rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 0.625rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: white;
+            font-weight: 600;
+            font-size: 0.8125rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+        }
+
+        .action-btn:hover {
+            background: #f9fafb;
+        }
+
+        .action-btn.primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .action-btn.primary:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            opacity: 0.3;
+            margin-bottom: 1rem;
+        }
+
+        .empty-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-subtitle {
+            font-size: 0.875rem;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5rem 2rem;
+        }
+
+        .spinner {
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: #f9fafb;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.875rem;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .rewrite-preview {
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-top: 1.25rem;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            font-size: 0.875rem;
+        }
+
+        .platform-badge {
+            display: inline-block;
+            padding: 0.375rem 0.875rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 6px;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: white;
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            box-shadow: var(--shadow-lg);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.error {
+            border-left-color: #dc2626;
+        }
+
+        .notification.success {
+            border-left-color: #10b981;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Responsive */
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .articles-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .search-filter-bar {
+                flex-direction: column;
+            }
+
+            .filter-group {
+                width: 100%;
+            }
+
+            .select {
+                flex: 1;
+            }
+
+            .feed-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content-animated {
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1 class="header-title">
+                <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                AI 知識庫
+            </h1>
+            <p class="header-subtitle">從RSS抓取文章，AI智能重製為社群內容</p>
+        </div>
+
+        <!-- RSS Management Section -->
+        <div class="rss-section">
+            <div class="rss-header">
+                <h2 style="font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                    <span>📡</span> RSS 來源管理
+                </h2>
+                <button class="btn btn-primary" onclick="fetchAllArticles()">
+                    <span>➕</span> 抓取文章
+                </button>
+            </div>
+
+            <div class="rss-content">
+                <div class="rss-label">推薦來源：</div>
+                <div class="rss-chips-container" id="quick-sources">
+                    <!-- Quick sources injected by JS -->
+                </div>
+            </div>
+
+            <div class="rss-content" style="margin-top: 1rem;">
+                <div class="rss-label">已加入來源：</div>
+                <div class="rss-chips-container" id="added-sources">
+                    <!-- Added sources injected by JS -->
+                </div>
+            </div>
+
+            <button class="btn btn-outline btn-sm" onclick="openAddFeedModal()" style="margin-top: 1rem;">
+                + 自訂來源
+            </button>
+        </div>
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <div class="search-filter-bar">
+        <div class="search-wrapper">
+            <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input type="text" class="search-input" placeholder="搜尋標題、摘要或關鍵字..." id="search-input">
+        </div>
+        <div class="filter-group">
+            <select class="select" id="platform-filter">
+                <option value="all">所有平台</option>
+                <option value="天下雜誌">天下雜誌</option>
+                <option value="數位時代">數位時代</option>
+                <option value="HBR">HBR</option>
+                <option value="Deloitte Insights">Deloitte Insights</option>
+                <option value="PwC Strategy&">PwC Strategy&</option>
+                <option value="Josh Bersin">Josh Bersin</option>
+                <option value="MIT Sloan">MIT Sloan</option>
+                <option value="其他">其他</option>
+            </select>
+            <select class="select" id="status-filter">
+                <option value="all">所有狀態</option>
+                <option value="pending">待處理</option>
+                <option value="processed">已處理</option>
+                <option value="published">已發布</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Stats & Tabs -->
+    <div class="stats-tabs">
+        <span class="stats-count">共 <span id="total-count">0</span> 篇文章</span>
+        <div class="tabs">
+            <button class="tab active" onclick="filterByStatus('all')">全部</button>
+            <button class="tab" onclick="filterByStatus('pending')">待處理</button>
+            <button class="tab" onclick="filterByStatus('processed')">已處理</button>
+        </div>
+    </div>
+
+    <!-- Articles Grid -->
+    <div id="articles-container">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Add Feed Modal -->
+    <div id="add-feed-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">新增 RSS 來源</h2>
+                <button class="close-btn" onclick="closeAddFeedModal()">×</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">來源名稱</label>
+                <input type="text" class="form-input" id="feed-name" placeholder="例如：天下雜誌">
+            </div>
+            <div class="form-group">
+                <label class="form-label">平台類型</label>
+                <select class="form-select" id="feed-platform">
+                    <option value="天下雜誌">天下雜誌</option>
+                    <option value="數位時代">數位時代</option>
+                    <option value="HBR">HBR</option>
+                    <option value="Josh Bersin">Josh Bersin</option>
+                    <option value="其他">其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">RSS URL</label>
+                <input type="text" class="form-input" id="feed-url" placeholder="https://...">
+            </div>
+            <button class="btn btn-primary" onclick="addCustomFeed()">新增來源</button>
+        </div>
+    </div>
+
+    <!-- Article Detail Modal -->
+    <div id="article-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">文章詳情</h2>
+                <button class="close-btn" onclick="closeArticleDetailModal()">×</button>
+            </div>
+            <div id="article-detail-content"></div>
+        </div>
+    </div>
+
+    <!-- Rewrite Modal -->
+    <div id="rewrite-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">AI 重製內容</h2>
+                <button class="close-btn" onclick="closeRewriteModal()">×</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">選擇平台</label>
+                <select class="form-select" id="rewrite-platform">
+                    <option value="linkedin">LinkedIn</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="instagram">Instagram</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">內容風格</label>
+                <select class="form-select" id="rewrite-tone">
+                    <option value="professional">專業正式</option>
+                    <option value="casual">輕鬆親切</option>
+                    <option value="inspiring">激勵鼓舞</option>
+                    <option value="analytical">深度分析</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="generateRewrite()" id="rewrite-btn">
+                <span id="rewrite-spinner"></span>
+                <span id="rewrite-btn-text">✨ AI 重製</span>
+            </button>
+            <div id="rewrite-result" style="display: none;">
+                <div class="platform-badge" id="platform-label"></div>
+                <div class="rewrite-preview" id="rewrite-content"></div>
+                <button class="btn btn-outline" onclick="copyRewrite()" style="width: 100%; margin-top: 1rem;">
+                    📋 複製內容
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data
+        const quickSourcesList = [
+            { id: 'cw-mgmt', name: '天下雜誌 - 經營管理', platform: '天下雜誌', url: 'https://www.cw.com.tw/rss/channel.action?chn=7' },
+            { id: 'cw-work', name: '天下雜誌 - 職場', platform: '天下雜誌', url: 'https://www.cw.com.tw/rss/channel.action?chn=8' },
+            { id: 'bnext', name: '數位時代', platform: '數位時代', url: 'https://www.bnext.com.tw/rss' },
+            { id: 'hbr', name: 'HBR', platform: 'HBR', url: 'https://hbr.org/rss/topic/leadership-and-managing-people' },
+            { id: 'deloitte', name: 'Deloitte Insights', platform: 'Deloitte Insights', url: 'https://www2.deloitte.com/us/en/insights/rss.xml' },
+            { id: 'techcrunch', name: 'TechCrunch', platform: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
+            { id: 'verge', name: 'The Verge', platform: 'The Verge', url: 'https://www.theverge.com/rss/index.xml' },
+            { id: 'mit', name: 'MIT Sloan', platform: 'MIT Sloan', url: 'https://sloanreview.mit.edu/feed/' }
+        ];
+
+        let feeds = [];
+        let articles = [];
+        let currentArticle = null;
+        let filteredArticles = [];
+
+        // Initial Load
+        document.addEventListener('DOMContentLoaded', () => {
+            // updateFetchStatus(); // Undefined, causing crash
+            loadFeeds();
+            loadArticles();
+            setupFilters();
+        });
+
+        // Legacy functions removed to prevent conflict with new loadFeeds()
+
+
+        // Add Custom Feed (from Modal)
+        async function addCustomFeed() {
+            const name = document.getElementById('feed-name').value.trim();
+            const platform = document.getElementById('feed-platform').value;
+            const url = document.getElementById('feed-url').value.trim();
+
+            if (!name || !url) {
+                showNotification('請填寫完整資訊', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/sources', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, url, platform, is_active: true })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification('✅ RSS 來源已新增！', 'success');
+                    closeAddFeedModal();
+                    loadFeeds();
+
+                    // Clear form
+                    document.getElementById('feed-name').value = '';
+                    document.getElementById('feed-url').value = '';
+                } else {
+                    showNotification('新增失敗: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showNotification('新增錯誤: ' + error.message, 'error');
+            }
+        }
+
+        // Fetch Articles (Trigger Backend)
+        async function fetchAllArticles() {
+            const btn = document.querySelector('.rss-header .btn-primary');
+            // Check if button exists to avoid errors if UI changed
+            if (!btn) {
+                console.error('Fetch button not found');
+                return;
+            }
+
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width: 1rem; height: 1rem; border-width: 2px;"></div> 抓取中...';
+
+            try {
+                const response = await fetch('/api/articles/fetch', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification(`✅ ${data.message}`, 'success');
+                    loadArticles();
+                } else {
+                    showNotification(`❌ 抓取失敗：${data.error}`, 'error');
+                }
+            } catch (error) {
+                showNotification(`❌ 抓取錯誤：${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // Load Feeds
+        async function loadFeeds() {
+            try {
+                const response = await fetch('/api/feeds');
+                const feeds = await response.json();
+                renderFeeds(feeds);
+            } catch (error) {
+                console.error('載入 RSS 來源失敗:', error);
+            }
+        }
+
+        function renderFeeds(feeds) {
+            const quickContainer = document.getElementById('quick-sources');
+            const addedContainer = document.getElementById('added-sources');
+
+            if (!quickContainer || !addedContainer) return;
+
+            // Split feeds
+            const suggested = feeds.filter(f => f.status === 'Suggested');
+            const added = feeds.filter(f => f.status !== 'Suggested');
+
+            // Render Suggested
+            quickContainer.innerHTML = suggested.map(feed => `
+                <div class="source-chip" onclick="copyToClipboard('${feed.url}')" title="點擊複製 URL">
+                    <span>${feed.name}</span>
+                    <span style="margin-left: auto; color: #0d9488; font-size: 1rem;">+</span>
+                </div>
+            `).join('');
+
+            // Render Added
+            if (added.length === 0) {
+                addedContainer.innerHTML = '<div style="color: #9ca3af; font-size: 0.875rem;">尚未加入來源</div>';
+            } else {
+                addedContainer.innerHTML = added.map(feed => `
+                     <div class="source-chip active">
+                        <span>${feed.name}</span>
+                        <button onclick="event.stopPropagation(); deleteSource('${feed.id}')" class="delete-btn">×</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function deleteSource(id) {
+            if (!confirm('確定要刪除此來源嗎？')) return;
+            // TODO: Implement delete API call
+            console.log('Delete source:', id);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('已複製 RSS URL，請至 Notion 新增', 'success');
+            });
+        }
+
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString || dateString === 'undefined') {
+                return '未知日期';
+            }
+            try {
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) return '未知日期';
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}/${month}/${day}`;
+            } catch (e) {
+                return '未知日期';
+            }
+        }
+
+        // Load Articles
+        async function loadArticles() {
+            try {
+                // ✅ 加入時間戳避免快取
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/articles?t=${timestamp}`);
+                const data = await response.json();
+
+                if (Array.isArray(data)) {
+                    articles = data.map(article => ({
+                        id: article.id || Date.now(),
+                        title: article.title,
+                        summary: article.summary,
+                        source: article.source,
+                        source_platform: article.source_platform || article.source,
+                        source_url: article.source_url || article.url,
+                        publish_date: article.published_date, // Fixed: Map from API 'published_date'
+                        keywords: article.topics || [],
+                        status: article.status || 'pending',
+                        ai_content: article.ai_content
+                    }));
+                } else {
+                    articles = [];
+                }
+                filterArticles();
+            } catch (err) {
+                console.error(err);
+                const container = document.getElementById('articles-container');
+                if (container) container.innerHTML = '<p class="empty-state">無法載入文章</p>';
+            }
+        }
+
+        function getTagCategory(tag) {
+            if (!tag) return 'bg-gray-100 text-gray-800';
+            if (tag.includes('科技') || tag.includes('AI') || tag.includes('數位')) return 'bg-blue-100 text-blue-800';
+            if (tag.includes('人才') || tag.includes('員工') || tag.includes('人資')) return 'bg-green-100 text-green-800';
+            if (tag.includes('文化') || tag.includes('共融')) return 'bg-purple-100 text-purple-800';
+            if (tag.includes('發展') || tag.includes('學習') || tag.includes('績效')) return 'bg-orange-100 text-orange-800';
+            if (tag.includes('變革') || tag.includes('規劃')) return 'bg-gray-100 text-gray-800';
+            return 'bg-gray-100 text-gray-800';
+        }
+
+        // Logo API 優先級列表
+        const LOGO_APIS = {
+            // API 1: Clearbit（最推薦，品質高）
+            clearbit: (domain) => `https://logo.clearbit.com/${domain}`,
+
+            // API 2: Google S2（備選，通用性好）
+            google: (domain) => `https://www.google.com/s2/favicons?domain=${domain}&sz=256`,
+
+            // API 3: DuckDuckGo（備選）
+            duckduckgo: (domain) => `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+
+            // API 4: Brandfetch（品質很高但可能需要 API key）
+            brandfetch: (domain) => `https://img.brandfetch.com/${domain}`
+        };
+
+        // 來源名稱 → 網域映射表
+        const SOURCE_DOMAINS = {
+            // The Economist
+            'THE ECONOMIST': 'economist.com',
+            'The Economist': 'economist.com',
+
+            // Josh Bersin
+            'JOSH BERSIN LATEST INSIGHTS (HR TECH)': 'joshbersin.com',
+            'Josh Bersin': 'joshbersin.com',
+            'JOSH BERSIN': 'joshbersin.com',
+
+            // Oxford Review  
+            'OXFORD REVIEW': 'oxford-review.com',
+            'Oxford Review': 'oxford-review.com',
+
+            // SHRM
+            'SHRM': 'shrm.org',
+            'SHRM Newsletter': 'shrm.org',
+
+            // Harvard Business Review
+            'HBR': 'hbr.org',
+            'Harvard Business Review': 'hbr.org',
+            'HBR (US) Leadership': 'hbr.org',
+            'HBR (US) Strategy': 'hbr.org',
+            'HBR (US) Human Resource Management': 'hbr.org',
+
+            // MIT Sloan
+            'MIT Sloan AI': 'sloanreview.mit.edu',
+            'MIT Sloan Management Review': 'sloanreview.mit.edu',
+
+            // Workday
+            'Workday Blog': 'workday.com',
+            'Workday': 'workday.com',
+
+            // VentureBeat
+            'VentureBeat AI': 'venturebeat.com',
+            'VentureBeat': 'venturebeat.com',
+
+            // HR Technologist
+            'HR Technologist': 'hrtechnologist.com',
+
+            // AI News
+            'AI News': 'artificialintelligence-news.com',
+
+            // 其他來源
+            'Deloitte Human Capital Trends': 'deloitte.com',
+            'PwC Strategy& (Thought Leadership)': 'pwc.com',
+            'ITmedia Business': 'itmedia.co.jp',
+            'PRESIDENT Online': 'president.jp',
+            'Handelsbla tt': 'handelsblatt.com',
+            '36氪 (Lattice)': '36kr.com',
+            '天下雜誌': 'cw.com.tw',
+            '數位時代': 'bnext.com.tw',
+            '日經中文網': 'cn.nikkei.com'
+        };
+
+        /**
+         * 獲取來源的 Logo URL
+         */
+        function getSourceLogoUrl(article) {
+            // 1. 從來源名稱獲取域名
+            let domain = SOURCE_DOMAINS[article.source];
+
+            // 2. 如果映射表中沒有，嘗試從 URL 提取
+            if (!domain && article.source_url && article.source_url !== 'undefined') {
+                try {
+                    domain = new URL(article.source_url).hostname.replace('www.', '');
+                } catch (e) {
+                    // console.warn('無法解析 URL:', article.source_url);
+                }
+            }
+            // Fallback to article.url if source_url is missing
+            if (!domain && article.url && article.url !== 'undefined') {
+                try {
+                    domain = new URL(article.url).hostname.replace('www.', '');
+                } catch (e) {
+                    console.warn('無法解析 URL:', article.url);
+                }
+            }
+
+            // 3. 如果還是沒有，返回 null
+            if (!domain) {
+                return null;
+            }
+
+            // 4. 返回 Clearbit Logo URL（最高品質）
+            return LOGO_APIS.clearbit(domain);
+        }
+
+        /**
+         * Logo 圖片加載失敗處理
+         * 自動嘗試備選 API
+         */
+        function handleLogoError(img, articleId) {
+            const currentSrc = img.src;
+            const article = articles.find(a => a.id == articleId);
+            if (!article) return;
+
+            // 獲取域名
+            let domain = SOURCE_DOMAINS[article.source];
+            if (!domain && article.source_url && article.source_url !== 'undefined') {
+                try {
+                    domain = new URL(article.source_url).hostname.replace('www.', '');
+                } catch (e) { }
+            }
+            if (!domain && article.url && article.url !== 'undefined') {
+                try {
+                    domain = new URL(article.url).hostname.replace('www.', '');
+                } catch (e) { }
+            }
+
+            if (!domain) {
+                // 顯示預設占位符
+                img.style.display = 'none';
+                img.parentElement.innerHTML = `
+                    <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.3); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 40px;">
+                        📰
+                    </div>
+                `;
+                return;
+            }
+
+            // 嘗試備選 API
+            if (currentSrc.includes('clearbit')) {
+                // Clearbit 失敗，嘗試 Google
+                img.src = LOGO_APIS.google(domain);
+            } else if (currentSrc.includes('google')) {
+                // Google 失敗，嘗試 Brandfetch
+                img.src = LOGO_APIS.brandfetch(domain);
+            } else {
+                // 全部失敗，顯示占位符
+                img.style.display = 'none';
+                img.parentElement.innerHTML = `
+                    <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.3); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <div style="text-align: center; color: white; font-weight: 600; font-size: 12px;">
+                            ${article.source || 'News'}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        /**
+         * 渲染文章卡片的 Logo 部分
+         */
+        function renderArticleLogo(article) {
+            const logoUrl = getSourceLogoUrl(article);
+            const articleId = article.id;
+            // Handle undefined article source
+            const safeSource = article.source || 'Unknown';
+            // Safe JSON stringify for onerror
+            const safeArticleId = article.id;
+
+            if (logoUrl) {
+                return `
+                    <div class="article-logo-container">
+                        <img 
+                            src="${logoUrl}" 
+                            alt="${safeSource}"
+                            class="source-logo"
+                            onerror="handleLogoError(this, '${safeArticleId}')"
+                            loading="lazy"
+                        >
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="article-logo-container">
+                        <div class="logo-placeholder">📰</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Render Articles
+        function renderArticles() {
+            const container = document.getElementById('articles-container');
+            if (!container) return;
+
+            // ✅ 允許的標籤清單 (Whitelist)
+            const allowedTags = [
+                '人力資源科技', '人才管理', '員工體驗', '領導力發展',
+                '多元共融', '職場文化', '薪酬福利', '績效管理',
+                '學習發展', '人力規劃', '員工敬業度', '變革管理',
+                '人工智慧', '數位轉型', '未來工作', '遠距工作', '員工福祉'
+            ];
+
+            // ❌ 禁止的關鍵字 (Blacklist)
+            const blockedKeywords = [
+                '102歲', '醫美', '黃金', '去美元化', '待處理',
+                '市場拓展', '品牌管理', '供應鏈', '股票', '期貨', '投資'
+            ];
+
+            const initialArticles = filteredArticles.length > 0 ? filteredArticles : (document.getElementById('search-input').value ? [] : articles);
+
+            // ✅ 雙重過濾機制 (Double Insurance Filtering)
+            const displayArticles = initialArticles.filter(article => {
+                // 1. 檢查標題是否包含不允許的關鍵字
+                const hasBlockedKeyword = blockedKeywords.some(keyword =>
+                    (article.title || '').includes(keyword)
+                );
+
+                if (hasBlockedKeyword) {
+                    console.log(`🚫 過濾關鍵字文章: ${article.title}`);
+                    return false;
+                }
+
+                // 2. 檢查是否有允許的標籤 (Whitelist Check)
+                if (!article.keywords || article.keywords.length === 0) {
+                    return false;
+                }
+
+                const hasValidTag = article.keywords.some(tag =>
+                    allowedTags.includes(tag)
+                );
+
+                if (!hasValidTag) {
+                    console.log(`⚠️ 過濾無效標籤文章: ${article.title} (${article.keywords})`);
+                    return false;
+                }
+
+                return true;
+            });
+
+            const countEl = document.getElementById('total-count');
+            if (countEl) countEl.textContent = displayArticles.length;
+
+            if (displayArticles.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📚</div>
+                        <div class="empty-title">沒有有效的文章</div>
+                        <div class="empty-subtitle">請重新抓取文章</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const platformBadgeClass = {
+                'PwC Strategy&': '',
+                'Josh Bersin': 'josh',
+                'MIT Sloan': 'mit',
+                'Deloitte Insights': 'deloitte'
+            };
+
+            const statusText = {
+                '待處理': '待處理',
+                'pending': '待處理',
+                'processed': '已處理',
+                'published': '已發布'
+            };
+
+            container.innerHTML = `
+                <div class="articles-grid">
+                    ${displayArticles.map(article => {
+                const articleUrl = article.source_url || article.url;
+                const hasUrl = articleUrl && articleUrl !== 'undefined';
+
+                return `
+                        <div class="article-card">
+                            ${renderArticleLogo(article)}
+                            <div class="article-content">
+                                <div class="article-header">
+                                    <span class="badge badge-source ${platformBadgeClass[article.source_platform] || ''}">
+                                        ${article.source || article.source_platform || '未知'}
+                                    </span>
+                                    <span class="badge badge-status ${article.status}">${statusText[article.status] || article.status}</span>
+                                </div>
+                                <h3 class="article-title">${article.title}</h3>
+                                <p class="article-excerpt">${article.summary}</p>
+                                <div class="article-meta">
+                                    <span>📅 ${formatDate(article.publish_date)}</span>
+                                </div>
+                                <div class="article-keywords">
+                                    ${article.keywords.slice(0, 3).map(kw => `
+                                        <span class="keyword-tag ${getTagCategory(kw)}">${kw}</span>
+                                    `).join('')}
+                                    ${article.keywords.length > 3 ? `
+                                        <span class="keyword-count">+${article.keywords.length - 3}</span>
+                                    ` : ''}
+                                </div>
+                                <div class="article-actions">
+                                    ${hasUrl ? `
+                                        <a href="${articleUrl}" target="_blank" rel="noopener noreferrer" class="btn-outline" style="flex:1; justify-content:center; text-decoration:none;">
+                                            📝 原文
+                                        </a>
+                                    ` : `
+                                        <button class="btn-outline" disabled style="flex:1;">📝 原文（暫無）</button>
+                                    `}
+                                    <button class="action-btn primary" onclick="showAIGenerateModal('${article.id}', '${article.title.replace(/'/g, "\\'")}', '${(article.summary || "").replace(/'/g, "\\'").substring(0, 100)}')" style="flex: 1;">
+                                        ✨ AI重製
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `}).join('')}
+                </div>
+            `;
+        }
+
+        // Filter Articles
+        function filterArticles() {
+            const searchInput = document.getElementById('search-input');
+            const platformFilter = document.getElementById('platform-filter');
+            const statusFilter = document.getElementById('status-filter');
+
+            if (!searchInput || !platformFilter || !statusFilter) return;
+
+            const searchTerm = searchInput.value.toLowerCase();
+            const platformVal = platformFilter.value;
+            const statusVal = statusFilter.value;
+
+            filteredArticles = articles.filter(article => {
+                const matchSearch = !searchTerm ||
+                    (article.title && article.title.toLowerCase().includes(searchTerm)) ||
+                    (article.summary && article.summary.toLowerCase().includes(searchTerm)) ||
+                    (article.keywords && article.keywords.some(kw => kw.toLowerCase().includes(searchTerm)));
+
+                const matchPlatform = platformVal === 'all' || article.source_platform === platformVal;
+                // Simplified status matching
+                const matchStatus = statusVal === 'all' || article.status === statusVal || (statusVal === 'pending' && article.status === '待處理');
+
+                return matchSearch && matchPlatform && matchStatus;
+            });
+
+            renderArticles();
+        }
+
+        function setupFilters() {
+            const searchInput = document.getElementById('search-input');
+            const platformFilter = document.getElementById('platform-filter');
+            const statusFilter = document.getElementById('status-filter');
+
+            if (searchInput) searchInput.addEventListener('input', filterArticles);
+            if (platformFilter) platformFilter.addEventListener('change', filterArticles);
+            if (statusFilter) statusFilter.addEventListener('change', filterArticles);
+        }
+
+        function filterByStatus(status) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const filterEl = document.getElementById('status-filter');
+            if (filterEl) {
+                filterEl.value = status;
+                filterArticles();
+            }
+        }
+
+        // View Article
+        function viewArticle(id) {
+            currentArticle = articles.find(a => String(a.id) === String(id));
+            if (!currentArticle) return;
+
+            const content = document.getElementById('article-detail-content');
+            if (!content) return;
+
+            content.innerHTML = `
+                <div class="article-header" style="margin-bottom: 1rem;">
+                    <span class="badge badge-source">${currentArticle.source_platform}</span>
+                </div>
+                <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">${currentArticle.title}</h2>
+                <div style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                    📅 ${formatDate(currentArticle.publish_date)}
+                </div>
+                <div class="article-keywords" style="margin-bottom: 1.5rem;">
+                    ${currentArticle.keywords.map(kw => `<span class="keyword-tag">${kw}</span>`).join('')}
+                </div>
+                <p style="line-height: 1.8; color: var(--text-secondary); white-space: pre-wrap;">${currentArticle.summary}</p>
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                    <h3 style="font-weight: 700; margin-bottom: 0.5rem">社群重製草稿</h3>
+                     <p style="line-height: 1.8; color: var(--text-primary); white-space: pre-wrap; background: #f9fafb; padding: 1rem; border-radius: 8px;">${currentArticle.ai_content || '尚未產生重製內容，請點擊「AI 重製」按鈕。'}</p>
+                </div>
+                <a href="${currentArticle.source_url}" target="_blank" class="btn btn-outline" style="margin-top: 1.5rem; width: 100%;">
+                    🔗 查看原文
+                </a>
+            `;
+
+            document.getElementById('article-detail-modal').classList.add('active');
+        }
+
+        // Rewrite Article
+        function rewriteArticle(id) {
+            currentArticle = articles.find(a => String(a.id) === String(id));
+            document.getElementById('rewrite-result').style.display = 'none';
+            document.getElementById('rewrite-modal').classList.add('active');
+        }
+
+        // Generate Rewrite
+        async function generateRewrite() {
+            const platform = document.getElementById('rewrite-platform').value;
+            const style = document.getElementById('rewrite-tone').value;
+            const btn = document.getElementById('rewrite-btn');
+            const spinner = document.getElementById('rewrite-spinner');
+            const btnText = document.getElementById('rewrite-btn-text');
+
+            btn.disabled = true;
+            spinner.innerHTML = '<div class="spinner" style="width: 1rem; height: 1rem; border-width: 2px;"></div>';
+            btnText.textContent = 'AI 重製中...';
+
+            try {
+                const response = await fetch('/api/ai/rewrite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        article_id: currentArticle.id,
+                        platform: platform,
+                        style: style,
+                        article: currentArticle
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.content) {
+                    const content = data.content;
+
+                    document.getElementById('platform-label').textContent = platform.toUpperCase();
+                    document.getElementById('rewrite-content').textContent = content;
+                    document.getElementById('rewrite-result').style.display = 'block';
+
+                    currentArticle.ai_content = content;
+                    currentArticle.status = 'processed';
+                    renderArticles();
+
+                    showNotification('✨ AI 重製完成！', 'success');
+                } else {
+                    showNotification('❌ ' + (data.error || '重製失敗'), 'error');
+                }
+
+            } catch (error) {
+                showNotification('❌ 重製錯誤: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.innerHTML = '';
+                btnText.textContent = '✨ AI 重製';
+            }
+        }
+
+        function copyRewrite() {
+            const content = document.getElementById('rewrite-content').textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                showNotification('✅ 已複製到剪貼簿！', 'success');
+            });
+        }
+
+        // Modal Functions
+        function openAddFeedModal() {
+            document.getElementById('add-feed-modal').classList.add('active');
+        }
+
+        function closeAddFeedModal() {
+            document.getElementById('add-feed-modal').classList.remove('active');
+        }
+
+        function closeArticleDetailModal() {
+            document.getElementById('article-detail-modal').classList.remove('active');
+        }
+
+        function closeRewriteModal() {
+            document.getElementById('rewrite-modal').classList.remove('active');
+        }
+
+        async function addCustomFeed() {
+            const name = document.getElementById('feed-name').value.trim();
+            const platform = document.getElementById('feed-platform').value;
+            const url = document.getElementById('feed-url').value.trim();
+
+            if (!name || !url) {
+                showNotification('請填寫完整資訊', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/sources', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, url, platform, is_active: true })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification('✅ RSS 來源已新增！', 'success');
+                    closeAddFeedModal();
+                    loadFeeds();
+
+                    // Clear form
+                    document.getElementById('feed-name').value = '';
+                    document.getElementById('feed-url').value = '';
+                } else {
+                    showNotification('新增失敗: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showNotification('新增錯誤: ' + error.message, 'error');
+            }
+        }
+
+        // Notification
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <span style="font-size: 1.25rem;">${type === 'success' ? '✓' : type === 'error' ? '⚠️' : 'ℹ️'}</span>
+                <span>${message}</span>
+            `;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        // Show AI Generate Modal
+        function showAIGenerateModal(articleId, articleTitle, articleSummary) {
+            const modalHTML = `
+                <div class="modal-overlay" onclick="if(event.target === this) this.remove()">
+                    <div class="modal-content modal-content-animated" onclick="event.stopPropagation()" style="max-width: 600px; background: white; border-radius: 16px; padding: 30px; position: relative;">
+                        <button onclick="this.closest('.modal-overlay').remove()" 
+                                style="position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; color: #9ca3af; line-height: 1;">
+                            &times;
+                        </button>
+                        
+                        <h2 style="margin: 0 0 20px 0; font-size: 24px; color: #111827;">✨ AI 重製內容</h2>
+                        
+                        <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                            <div style="font-size: 13px; color: #6b7280; margin-bottom: 6px;">原文章</div>
+                            <div style="font-weight: 600; color: #111827; font-size: 16px;">${articleTitle}</div>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 14px;">選擇平台</label>
+                            <select id="platform-select" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; background: white;">
+                                <option value="Instagram">Instagram</option>
+                                <option value="LinkedIn">LinkedIn</option>
+                                <option value="Facebook">Facebook</option>
+                                <option value="Twitter">Twitter / X</option>
+                            </select>
+                        </div>
+                        
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 14px;">內容風格</label>
+                            <select id="style-select" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; background: white;">
+                                <option value="專業正式">專業正式</option>
+                                <option value="輕鬆親切">輕鬆親切</option>
+                                <option value="激勵鼓舞">激勵鼓舞</option>
+                                <option value="深度分析">深度分析</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 移除儲存選項，改為生成後決定 -->
+                        
+                        <button id="generate-btn" 
+                                onclick="generateAIContent('${articleId}')"
+                                style="width: 100%; padding: 14px; background: #0d9488; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                            ✨ AI 重製
+                        </button>
+                        
+                        <div id="result-area" style="display: none; margin-top: 24px;">
+                            <div style="background: #f0fdfa; border: 2px solid #0d9488; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+                                <div style="font-weight: 600; color: #0d9488; margin-bottom: 12px; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                                    <span>✅ 生成成功</span>
+                                    <span id="save-status" style="font-size: 13px; color: #059669;"></span>
+                                </div>
+                                <div id="generated-text" style="white-space: pre-wrap; line-height: 1.8; color: #1f2937; font-size: 14px;"></div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <button onclick="copyOnly()" 
+                                        style="padding: 12px; background: white; border: 2px solid #0d9488; color: #0d9488; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: all 0.2s;">
+                                    📋 複製內容
+                                </button>
+                                
+                                <button onclick="copyAndSave()" 
+                                        id="save-btn"
+                                        style="padding: 12px; background: #0d9488; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: all 0.2s;">
+                                    💾 複製並存入 Notion
+                                </button>
+                            </div>
+                            
+                            <button onclick="this.closest('.modal-overlay').remove()" 
+                                    style="width: 100%; padding: 12px; background: #f3f4f6; color: #6b7280; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                                關閉
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const oldModal = document.querySelector('.modal-overlay');
+            if (oldModal) oldModal.remove();
+
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        async function generateAIContent(articleId) {
+            const btn = document.getElementById('generate-btn');
+            const resultArea = document.getElementById('result-area');
+            const platform = document.getElementById('platform-select').value;
+            const style = document.getElementById('style-select').value;
+
+            btn.disabled = true;
+            btn.innerHTML = '⏳ 生成中...';
+
+            try {
+                const response = await fetch('/api/generate-content', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        article_id: articleId,
+                        platform: platform,
+                        style: style
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('generated-text').textContent = data.content;
+                    resultArea.style.display = 'block';
+                    btn.style.display = 'none';
+
+                    window.currentGeneration = {
+                        content: data.content,
+                        articleId: articleId,
+                        platform: platform,
+                        style: style
+                    };
+                } else {
+                    alert('生成失敗：' + (data.error || '未知錯誤'));
+                    btn.disabled = false;
+                    btn.innerHTML = '✨ AI 重製';
+                }
+            } catch (error) {
+                alert('生成失敗：' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = '✨ AI 重製';
+            }
+        }
+
+        function copyOnly() {
+            if (window.currentGeneration && window.currentGeneration.content) {
+                navigator.clipboard.writeText(window.currentGeneration.content)
+                    .then(() => {
+                        alert('✅ 已複製到剪貼簿！');
+                    })
+                    .catch(err => {
+                        console.error('複製失敗:', err);
+                        alert('❌ 複製失敗');
+                    });
+            }
+        }
+
+        async function copyAndSave() {
+            if (!window.currentGeneration) {
+                alert('❌ 沒有可儲存的內容');
+                return;
+            }
+
+            const saveBtn = document.getElementById('save-btn');
+            const saveStatus = document.getElementById('save-status');
+
+            // 先複製
+            try {
+                await navigator.clipboard.writeText(window.currentGeneration.content);
+            } catch (err) {
+                alert('❌ 複製失敗');
+                return;
+            }
+
+            // 再儲存到 Notion
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '⏳ 儲存中...';
+
+            try {
+                const response = await fetch('/api/save-to-notion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        article_id: window.currentGeneration.articleId,
+                        content: window.currentGeneration.content,
+                        platform: window.currentGeneration.platform,
+                        style: window.currentGeneration.style
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    saveStatus.textContent = '（已存入 Notion）';
+                    saveBtn.innerHTML = '✅ 已儲存';
+                    saveBtn.style.background = '#059669';
+                    alert('✅ 已複製到剪貼簿並儲存到 Notion！');
+                } else {
+                    throw new Error(data.error || '儲存失敗');
+                }
+            } catch (error) {
+                alert('❌ 儲存到 Notion 失敗：' + error.message + '\n\n但內容已複製到剪貼簿。');
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '💾 複製並存入 Notion';
+            }
+        }
+    </script>
+</body>
+
+```
