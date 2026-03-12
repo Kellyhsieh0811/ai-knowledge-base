@@ -126,18 +126,18 @@ class NotionService:
         platform = article_data.get('source_platform', 'Other')
         
         properties = {
-            "Title": {
+            "名稱": {
                 "title": [{"text": {"content": title}}]
             },
             "URL": {
                 "url": url
             },
             "Published Date": {
-                "date": {"start": pub_date}
+                "rich_text": [{"text": {"content": pub_date}}]
             },
 
             "Fetched Date": {
-                "date": {"start": datetime.now().isoformat()}
+                "rich_text": [{"text": {"content": datetime.now().isoformat()}}]
             },
             "Platform": {
                 "select": {"name": platform}
@@ -146,18 +146,18 @@ class NotionService:
                 "rich_text": [{"text": {"content": summary[:2000]}}]
             },
             "Topic": {
-                "multi_select": [{"name": t} for t in article_data.get('topics', [])]
+                "rich_text": [{"text": {"content": ", ".join(article_data.get('topics', []))}}]
+            },
+            "Source": {
+                "select": {"name": article_data.get('source', 'Unknown')}
             },
             "AI Content": {
                 "rich_text": [{"text": {"content": article_data.get('ai_content', '')[:2000]}}]
+            },
+            "status ": {
+                "select": {"name": "待處理"}
             }
         }
-
-        # If source_id is provided, create Relation
-        if source_id:
-            properties["Source"] = {
-                "relation": [{"id": source_id}]
-            }
         
         children = [
              {
@@ -183,12 +183,19 @@ class NotionService:
     def update_feed_timestamp(self, page_id):
         """
         Update '最後抓取時間' in Database 1 (RSS Feeds)
+        Important: Diagnosis shows this is a 'rich_text' field in the Notion database.
         """
         endpoint = f"pages/{page_id}"
         payload = {
             "properties": {
                 "最後抓取時間": {
-                    "date": {"start": datetime.now().isoformat()}
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                        }
+                    ]
                 }
             }
         }
@@ -209,6 +216,9 @@ class NotionService:
                 },
                 "Platform": {
                     "select": {"name": platform}
+                },
+                "status ": {
+                    "select": {"name": "已分析"}
                 }
             }
         }
@@ -322,31 +332,36 @@ class NotionService:
             for page in response.get('results', []):
                 props = page['properties']
                 
-                # 讀取來源（Relation 欄位）
+                # 讀取來源
                 source_name = ''
-                if 'Source' in props and props['Source']['relation']:
-                    try:
-                        source_id = props['Source']['relation'][0]['id']
-                        # Fetch source page to get name
-                        source_page = self.get_article(source_id) # Reuse get_article which does GET page
-                        if source_page:
-                            sp_props = source_page['properties']
-                            # 來源 DB 的名稱欄位是 "名稱"
-                            if '名稱' in sp_props:
-                                title_list = sp_props['名稱']['title']
-                                if title_list:
-                                    source_name = title_list[0]['text']['content']
-                            elif 'Name' in sp_props:
-                                title_list = sp_props['Name']['title']
-                                if title_list:
-                                    source_name = title_list[0]['text']['content']
-                    except Exception as e:
-                        print(f"Error fetching source name: {e}")
-                        source_name = "Unknown"
+                if 'Source' in props:
+                    source_prop = props['Source']
+                    # 優先使用 select 格式
+                    if source_prop.get('type') == 'select' and source_prop.get('select'):
+                        source_name = source_prop['select']['name']
+                    # 相容舊的 relation 格式
+                    elif source_prop.get('type') == 'relation' and source_prop.get('relation'):
+                        try:
+                            source_id = source_prop['relation'][0]['id']
+                            source_page = self.get_article(source_id)
+                            if source_page:
+                                sp_props = source_page.get('properties', {})
+                                if '名稱' in sp_props and sp_props['名稱'].get('title'):
+                                    source_name = sp_props['名稱']['title'][0]['text']['content']
+                                elif 'Name' in sp_props and sp_props['Name'].get('title'):
+                                    source_name = sp_props['Name']['title'][0]['text']['content']
+                        except Exception as e:
+                            print(f"Error fetching source name from relation: {e}")
+                            source_name = "Unknown"
+                    # 其他可能的文字格式 (rich_text)
+                    elif source_prop.get('type') == 'rich_text' and source_prop.get('rich_text'):
+                        source_name = source_prop['rich_text'][0]['text']['content']
                 
                 # 讀取標題
                 title = ''
-                if 'Title' in props and props['Title']['title']:
+                if '名稱' in props and props['名稱']['title']:
+                    title = props['名稱']['title'][0]['text']['content']
+                elif 'Title' in props and props['Title']['title']:
                     title = props['Title']['title'][0]['text']['content']
                 
                 # 讀取摘要
@@ -356,16 +371,23 @@ class NotionService:
                 
                 # 讀取標籤
                 topics = []
-                if 'Topic' in props and props['Topic']['multi_select']:
-                    topics = [tag['name'] for tag in props['Topic']['multi_select']]
+                if 'Topic' in props:
+                    if props['Topic']['type'] == 'multi_select':
+                        topics = [tag['name'] for tag in props['Topic']['multi_select']]
+                    elif props['Topic']['type'] == 'rich_text' and props['Topic']['rich_text']:
+                        topics_str = props['Topic']['rich_text'][0]['text']['content']
+                        topics = [t.strip() for t in topics_str.split(',') if t.strip()]
                 
                 # 讀取其他欄位
                 url_obj = props.get('URL', {})
                 url = url_obj.get('url') if url_obj else ''
                 
                 published_date = ''
-                if 'Published Date' in props and props['Published Date']['date']:
-                    published_date = props['Published Date']['date']['start']
+                if 'Published Date' in props:
+                    if props['Published Date']['type'] == 'date' and props['Published Date']['date']:
+                        published_date = props['Published Date']['date']['start']
+                    elif props['Published Date']['type'] == 'rich_text' and props['Published Date']['rich_text']:
+                        published_date = props['Published Date']['rich_text'][0]['text']['content']
                 
                 status = '待處理'
                 # Check for "status" (lower case) or "Status" (capitalized) logic?
@@ -378,7 +400,9 @@ class NotionService:
                 # "if 'status' in props ...".
                 # I will include defensive reading.
                 
-                if 'Status' in props and props.get('Status', {}).get('status'):
+                if 'status ' in props and props.get('status ', {}).get('select'):
+                     status = props['status ']['select']['name']
+                elif 'Status' in props and props.get('Status', {}).get('status'):
                      status = props['Status']['status']['name']
                 elif 'status' in props and props.get('status', {}).get('select'):
                     status = props['status']['select']['name']

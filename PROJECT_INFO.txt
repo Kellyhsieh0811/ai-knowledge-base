@@ -1,0 +1,23 @@
+AI 知識庫專案資訊
+==================
+
+📍 專案位置
+/Users/kellyhsieh/.gemini/antigravity/scratch/rss-knowledge-base
+
+🚀 啟動方式
+cd /Users/kellyhsieh/.gemini/antigravity/scratch/rss-knowledge-base
+python3 src/app.py
+訪問：http://127.0.0.1:5005
+
+🔑 環境變數（.env）
+- NOTION_TOKEN=secret_xxx
+- NOTION_DATABASE_ID=xxx
+- OPENAI_API_KEY=sk-proj-xxx
+
+⚠️  重要提醒
+- .env 檔案包含敏感資訊，不要上傳到 Git
+- 如果要分享專案，使用 .env.example
+- 上傳 GitHub 前務必確認 .env 已被 .gitignore 排除
+
+📝 最後更新
+2026-02-11

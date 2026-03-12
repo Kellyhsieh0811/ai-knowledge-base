@@ -861,77 +861,106 @@
 
 <body>
     <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1 class="header-title">
-                <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                AI 知識庫
-            </h1>
-            <p class="header-subtitle">從RSS抓取文章，AI智能重製為社群內容</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <!-- Title -->
+            <div>
+                <h1 class="header-title" style="margin: 0; display: flex; align-items: center; gap: 12px;">
+                    <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        style="width: 32px; height: 32px;">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    AI 知識庫
+                </h1>
+                <p class="header-subtitle" style="margin: 8px 0 0 0;">從RSS抓取文章，AI智能重製為社群內容</p>
+            </div>
+
+            <!-- Buttons -->
+            <div style="display: flex; gap: 12px;">
+                <button onclick="showRSSManager()"
+                    style="padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    ⚙️ RSS 管理
+                </button>
+                <button onclick="fetchRSS()" id="fetch-btn"
+                    style="padding: 10px 20px; background: #0d9488; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    📡 抓取文章
+                </button>
+            </div>
         </div>
 
         <!-- RSS Management Section -->
-        <div class="rss-section">
-            <div class="rss-header">
-                <h2 style="font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-                    <span>📡</span> RSS 來源管理
-                </h2>
-                <button class="btn btn-primary" onclick="fetchAllArticles()">
-                    <span>➕</span> 抓取文章
+        <!-- RSS 來源管理區域 -->
+        <div
+            style="background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; font-size: 18px; color: #111827;">📡 RSS 來源管理</h3>
+                <button onclick="toggleRSSSection()" id="toggle-rss-btn"
+                    style="background: none; border: none; cursor: pointer; font-size: 14px; color: #6b7280; padding: 4px 8px;">
+                    收起 ▲
                 </button>
             </div>
 
-            <div class="rss-content">
-                <div class="rss-label">推薦來源：</div>
-                <div class="rss-chips-container" id="quick-sources">
-                    <!-- Quick sources injected by JS -->
+            <!-- RSS 內容區域（預設顯示）-->
+            <div id="rss-section" style="display: block;">
+                <!-- 推薦來源 -->
+                <div style="margin-bottom: 24px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #6b7280; font-weight: 600;">推薦來源：</h4>
+                    <div id="suggested-sources" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <!-- 推薦來源會在這裡動態載入 -->
+                    </div>
                 </div>
-            </div>
 
-            <div class="rss-content" style="margin-top: 1rem;">
-                <div class="rss-label">已加入來源：</div>
-                <div class="rss-chips-container" id="added-sources">
-                    <!-- Added sources injected by JS -->
+                <!-- 已加入來源 -->
+                <div>
+                    <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #6b7280; font-weight: 600;">已加入來源：</h4>
+                    <div id="added-sources" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <!-- 已加入來源會在這裡動態載入 -->
+                    </div>
                 </div>
-            </div>
 
-            <button class="btn btn-outline btn-sm" onclick="openAddFeedModal()" style="margin-top: 1rem;">
-                + 自訂來源
-            </button>
+                <!-- 自訂來源按鈕 -->
+                <button onclick="addCustomSource()"
+                    style="margin-top: 16px; padding: 8px 16px; background: none; border: 1px dashed #d1d5db; color: #6b7280; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                    + 自訂來源
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- Search & Filter Bar -->
-    <div class="search-filter-bar">
-        <div class="search-wrapper">
-            <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input type="text" class="search-input" placeholder="搜尋標題、摘要或關鍵字..." id="search-input">
+    <!-- Search & Filter Bar -->
+    <div class="search-filter-bar" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; gap: 12px; align-items: center; flex: 1;">
+            <div class="search-wrapper" style="max-width: 300px;">
+                <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input type="text" class="search-input" placeholder="搜尋標題、摘要或關鍵字..." id="search-input">
+            </div>
+            <div class="filter-group">
+                <select class="select" id="platform-filter">
+                    <option value="all">所有平台</option>
+                    <option value="天下雜誌">天下雜誌</option>
+                    <option value="數位時代">數位時代</option>
+                    <option value="HBR">HBR</option>
+                    <option value="Deloitte Insights">Deloitte Insights</option>
+                    <option value="PwC Strategy&">PwC Strategy&</option>
+                    <option value="Josh Bersin">Josh Bersin</option>
+                    <option value="MIT Sloan">MIT Sloan</option>
+                    <option value="其他">其他</option>
+                </select>
+                <select class="select" id="status-filter">
+                    <option value="all">所有狀態</option>
+                    <option value="pending">待處理</option>
+                    <option value="processed">已處理</option>
+                    <option value="published">已發布</option>
+                </select>
+            </div>
         </div>
-        <div class="filter-group">
-            <select class="select" id="platform-filter">
-                <option value="all">所有平台</option>
-                <option value="天下雜誌">天下雜誌</option>
-                <option value="數位時代">數位時代</option>
-                <option value="HBR">HBR</option>
-                <option value="Deloitte Insights">Deloitte Insights</option>
-                <option value="PwC Strategy&">PwC Strategy&</option>
-                <option value="Josh Bersin">Josh Bersin</option>
-                <option value="MIT Sloan">MIT Sloan</option>
-                <option value="其他">其他</option>
-            </select>
-            <select class="select" id="status-filter">
-                <option value="all">所有狀態</option>
-                <option value="pending">待處理</option>
-                <option value="processed">已處理</option>
-                <option value="published">已發布</option>
-            </select>
-        </div>
+
+
+    </div>
     </div>
 
     <!-- Stats & Tabs -->
@@ -1009,12 +1038,17 @@
             </div>
             <div class="form-group">
                 <label class="form-label">內容風格</label>
-                <select class="form-select" id="rewrite-tone">
-                    <option value="professional">專業正式</option>
-                    <option value="casual">輕鬆親切</option>
-                    <option value="inspiring">激勵鼓舞</option>
-                    <option value="analytical">深度分析</option>
+                <select class="select" id="timeFilter" style="min-width: 140px;">
+                    <option value="all">所有時間</option>
+                    <option value="today">今天</option>
+                    <option value="week">本週</option>
+                    <option value="month">本月</option>
                 </select>
+
+                <button onclick="showRSSManager()" class="btn"
+                    style="background: #6366f1; color: white; border: none; border-radius: 8px;">
+                    ⚙️ RSS 管理
+                </button>
             </div>
             <button class="btn btn-primary" onclick="generateRewrite()" id="rewrite-btn">
                 <span id="rewrite-spinner"></span>
@@ -1050,130 +1084,117 @@
 
         // Initial Load
         document.addEventListener('DOMContentLoaded', () => {
-            // updateFetchStatus(); // Undefined, causing crash
-            loadFeeds();
             loadArticles();
+            loadRSSSources();  // 載入 RSS 來源列表
             setupFilters();
         });
 
-        // Legacy functions removed to prevent conflict with new loadFeeds()
+        // Toggle RSS Section
+        function toggleRSSSection() {
+            const section = document.getElementById('rss-section');
+            const btn = document.getElementById('toggle-rss-btn');
 
-
-        // Add Custom Feed (from Modal)
-        async function addCustomFeed() {
-            const name = document.getElementById('feed-name').value.trim();
-            const platform = document.getElementById('feed-platform').value;
-            const url = document.getElementById('feed-url').value.trim();
-
-            if (!name || !url) {
-                showNotification('請填寫完整資訊', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/sources', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, url, platform, is_active: true })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showNotification('✅ RSS 來源已新增！', 'success');
-                    closeAddFeedModal();
-                    loadFeeds();
-
-                    // Clear form
-                    document.getElementById('feed-name').value = '';
-                    document.getElementById('feed-url').value = '';
-                } else {
-                    showNotification('新增失敗: ' + data.error, 'error');
-                }
-            } catch (error) {
-                showNotification('新增錯誤: ' + error.message, 'error');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                btn.textContent = '收起 ▲';
+            } else {
+                section.style.display = 'none';
+                btn.textContent = '展開 ▼';
             }
         }
 
-        // Fetch Articles (Trigger Backend)
-        async function fetchAllArticles() {
-            const btn = document.querySelector('.rss-header .btn-primary');
-            // Check if button exists to avoid errors if UI changed
-            if (!btn) {
-                console.error('Fetch button not found');
-                return;
+        // Show RSS Manager (Helper for button)
+        function showRSSManager() {
+            const section = document.getElementById('rss-section');
+            if (section.style.display === 'none') {
+                toggleRSSSection();
             }
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
 
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner" style="width: 1rem; height: 1rem; border-width: 2px;"></div> 抓取中...';
-
+        // Fetch RSS Wrapper
+        async function fetchRSS() {
+            const btn = document.getElementById('fetch-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ 抓取中...';
+            }
+            showNotification('開始抓取文章，請稍候...', 'info');
             try {
-                const response = await fetch('/api/articles/fetch', {
-                    method: 'POST'
-                });
+                const response = await fetch('/api/rss/fetch', { method: 'POST' });
                 const data = await response.json();
-
                 if (data.success) {
-                    showNotification(`✅ ${data.message}`, 'success');
-                    loadArticles();
+                    showNotification(`✅ ${data.message || '抓取完成'}`, 'success');
+                    loadArticles(); // 重新載入文章列表
                 } else {
-                    showNotification(`❌ 抓取失敗：${data.error}`, 'error');
+                    showNotification(`❌ 抓取失敗：${data.message || data.error || '未知錯誤'}`, 'error');
                 }
-            } catch (error) {
-                showNotification(`❌ 抓取錯誤：${error.message}`, 'error');
+            } catch (err) {
+                showNotification(`❌ 連線錯誤：${err.message}`, 'error');
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '📡 抓取文章';
+                }
             }
         }
 
-        // Load Feeds
-        async function loadFeeds() {
+        // Load RSS Sources
+        async function loadRSSSources() {
             try {
                 const response = await fetch('/api/feeds');
-                const feeds = await response.json();
-                renderFeeds(feeds);
+                const data = await response.json();
+
+                if (!data.success) {
+                    console.error('載入 RSS 來源失敗');
+                    return;
+                }
+
+                // 渲染推薦來源
+                const suggestedContainer = document.getElementById('suggested-sources');
+                if (suggestedContainer && data.suggested_sources) {
+                    suggestedContainer.innerHTML = data.suggested_sources.map(source => `
+                        <button onclick="toggleSource('${source.id}')" 
+                                style="padding: 8px 16px; background: white; border: 1px solid #e5e7eb; color: #374151; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.2s;">
+                            ${source.name} +
+                        </button>
+                    `).join('');
+                }
+
+                // 渲染已加入來源
+                const addedContainer = document.getElementById('added-sources');
+                // NOTE: data.rss_sources maps to added sources from backend
+                const addedSources = data.rss_sources || data.added_sources;
+                if (addedContainer && addedSources) {
+                    addedContainer.innerHTML = addedSources.map(source => `
+                        <button onclick="toggleSource('${source.id}')" 
+                                style="padding: 8px 16px; background: #0d9488; border: none; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                            ${source.name} <span style="font-size: 12px;">✕</span>
+                        </button>
+                    `).join('');
+                }
+
             } catch (error) {
-                console.error('載入 RSS 來源失敗:', error);
+                console.error('載入 RSS 來源錯誤:', error);
             }
         }
 
-        function renderFeeds(feeds) {
-            const quickContainer = document.getElementById('quick-sources');
-            const addedContainer = document.getElementById('added-sources');
-
-            if (!quickContainer || !addedContainer) return;
-
-            // Split feeds
-            const suggested = feeds.filter(f => f.status === 'Suggested');
-            const added = feeds.filter(f => f.status !== 'Suggested');
-
-            // Render Suggested
-            quickContainer.innerHTML = suggested.map(feed => `
-                <div class="source-chip" onclick="copyToClipboard('${feed.url}')" title="點擊複製 URL">
-                    <span>${feed.name}</span>
-                    <span style="margin-left: auto; color: #0d9488; font-size: 1rem;">+</span>
-                </div>
-            `).join('');
-
-            // Render Added
-            if (added.length === 0) {
-                addedContainer.innerHTML = '<div style="color: #9ca3af; font-size: 0.875rem;">尚未加入來源</div>';
-            } else {
-                addedContainer.innerHTML = added.map(feed => `
-                     <div class="source-chip active">
-                        <span>${feed.name}</span>
-                        <button onclick="event.stopPropagation(); deleteSource('${feed.id}')" class="delete-btn">×</button>
-                    </div>
-                `).join('');
-            }
+        // Toggle Source Stub
+        function toggleSource(sourceId) {
+            alert(`切換來源: ${sourceId}\n\n此功能需要與 Notion 整合`);
+            // TODO: Implement toggle
         }
 
-        function deleteSource(id) {
-            if (!confirm('確定要刪除此來源嗎？')) return;
-            // TODO: Implement delete API call
-            console.log('Delete source:', id);
+        // Add Custom Source Stub
+        function addCustomSource() {
+            const name = prompt('請輸入 RSS 來源名稱：');
+            if (!name) return;
+
+            const url = prompt('請輸入 RSS URL：');
+            if (!url) return;
+
+            alert(`新增來源：${name}\nURL: ${url}\n\n此功能需要與 Notion 整合`);
+            // TODO: Implement add
         }
 
         function copyToClipboard(text) {
@@ -1957,7 +1978,125 @@
                 saveBtn.innerHTML = '💾 複製並存入 Notion';
             }
         }
+        // 顯示 RSS 管理介面
+        async function showRSSManager() {
+            try {
+                // 暫時使用硬編碼的 RSS 列表
+                const hardcodedFeeds = [
+                    { id: 'cw1', name: '天下雜誌 管理頻道', url: 'https://www.cw.com.tw/RSS/cw_content.xml', is_active: true },
+                    { id: 'cw2', name: '天下雜誌 職場頻道', 'url': 'https://www.cw.com.tw/RSS/cw_content.xml', is_active: true },
+                    { id: 'bnext1', name: '數位時代 所有最新文章', url: 'https://www.bnext.com.tw/rss/articles', is_active: false },
+                    { id: 'bnext2', name: '數位時代 未來商務', url: 'https://fc.bnext.com.tw/rss', is_active: false },
+                    { id: 'hbr1', name: 'HBR (US) Human Resource Management', url: 'https://hbr.org/topic/human-resource-management/rss', is_active: false },
+                    { id: 'hbr2', name: 'HBR (US) Strategy', url: 'https://hbr.org/topic/strategy/rss', is_active: false },
+                    { id: 'hbr3', name: 'HBR (US) Leadership', url: 'https://hbr.org/topic/leadership/rss', is_active: false },
+                    { id: 'josh', name: 'Josh Bersin Latest Insights (HR Tech)', url: 'https://joshbersin.com/feed/', is_active: true },
+                    { id: 'oxford', name: 'Oxford Review', url: 'https://feed.podbean.com/oxford-review/feed.xml', is_active: true },
+                    { id: 'economist', name: 'The Economist', 'url': 'https://www.economist.com/business/rss.xml', is_active: true },
+                    { id: '36kr', name: '36氪 (Lattice)', url: 'https://36kr.com/feed', is_active: true },
+                    { id: 'president', 'name': 'PRESIDENT Online', url: 'https://president.jp/list/rss', is_active: true },
+                    { id: 'itmedia', name: 'ITmedia Business', url: 'https://rss.itmedia.co.jp/rss/2.0/business.xml', is_active: true },
+                    { id: 'nikkei', name: '日経中文網', url: 'https://zh.cn.nikkei.com/rss.xml', is_active: true },
+                    { id: 'handelsblatt', name: 'Handelsblatt', url: 'https://www.handelsblatt.com/contentexport/feed/top-themen', is_active: true },
+                    { id: 'shrm', name: 'SHRM', url: 'https://www.shrm.org/resourcesandtools/hr-topics/pages/rss.aspx', is_active: false },
+                    { id: 'ainews', name: 'AI News', 'url': 'https://www.artificialintelligence-news.com/feed/', is_active: true }
+                ];
+
+                // 建立管理介面
+                const modalHTML = `
+                    <div class="modal-overlay" onclick="if(event.target === this) this.remove()" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 3000; display: flex; align-items: center; justify-content: center;">
+                        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 1000px; max-height: 90vh; overflow-y: auto; background: white; border-radius: 16px; padding: 30px; position: relative;">
+                            <button onclick="this.closest('.modal-overlay').remove()" 
+                                    style="position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; color: #9ca3af; line-height: 1;">
+                                &times;
+                            </button>
+                            
+                            <h2 style="margin: 0 0 24px 0; font-size: 24px; color: #111827;">⚙️ RSS 來源管理</h2>
+                            
+                            <div style="margin-bottom: 20px; padding: 12px; background: #fef3c7; border-radius: 8px; font-size: 14px; color: #92400e;">
+                                ⚠️ 只有驗證有效的 RSS 來源才能啟用。點擊「驗證」檢查 URL 是否有效。
+                            </div>
+                            
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #f3f4f6; border-bottom: 2px solid #e5e7eb;">
+                                        <th style="padding: 12px; text-align: left; font-weight: 600;">來源名稱</th>
+                                        <th style="padding: 12px; text-align: left; font-weight: 600; max-width: 300px;">URL</th>
+                                        <th style="padding: 12px; text-align: center; font-weight: 600;">狀態</th>
+                                        <th style="padding: 12px; text-align: center; font-weight: 600;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${hardcodedFeeds.map(feed => `
+                                        <tr style="border-bottom: 1px solid #e5e7eb;">
+                                            <td style="padding: 12px; font-weight: 500;">${feed.name}</td>
+                                            <td style="padding: 12px; font-size: 12px; color: #6b7280; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                ${feed.url}
+                                            </td>
+                                            <td style="padding: 12px; text-align: center;">
+                                                <span id="status-${feed.id}" style="padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; background: #f3f4f6; color: #6b7280;">
+                                                    ${feed.is_active ? '✅ 已啟用' : '⭕ 未啟用'}
+                                                </span>
+                                            </td>
+                                            <td style="padding: 12px; text-align: center;">
+                                                <button onclick="validateSingleRSS('${feed.id}', '${feed.url.replace(/'/g, "\\'")}' )" 
+                                                        style="padding: 6px 12px; background: #0d9488; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; margin-right: 6px;">
+                                                    🔍 驗證
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+            } catch (error) {
+                console.error('RSS 管理錯誤:', error);
+                alert('開啟 RSS 管理失敗：' + error.message);
+            }
+        }
+
+        // 驗證單個 RSS (Simplified Version)
+        async function validateSingleRSS(feedId, url) {
+            const statusEl = document.getElementById(`status-${feedId}`);
+            statusEl.textContent = '⏳ 驗證中...';
+            statusEl.style.background = '#fef3c7';
+            statusEl.style.color = '#92400e';
+
+            try {
+                const response = await fetch('/api/rss/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (data.valid) {
+                    statusEl.textContent = `✅ 有效（${data.article_count} 篇）`;
+                    statusEl.style.background = '#d1fae5';
+                    statusEl.style.color = '#065f46';
+                } else {
+                    statusEl.textContent = '❌ 無效';
+                    statusEl.style.background = '#fee2e2';
+                    statusEl.style.color = '#991b1b';
+                    alert(`RSS 無效：${data.message}`);
+                }
+            } catch (error) {
+                statusEl.textContent = '⚠️ 錯誤';
+                statusEl.style.background = '#fee2e2';
+                statusEl.style.color = '#991b1b';
+                alert('驗證失敗：' + error.message);
+            }
+        }
+        // Initialize
+        loadInitialData();
     </script>
 </body>
 
+</html>
 ```
