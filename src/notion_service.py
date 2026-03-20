@@ -1,17 +1,19 @@
 import requests
 import json
 from datetime import datetime
+import pytz
 from config import settings
+
 
 class NotionService:
     def __init__(self, token=None, rss_db_id=None, content_db_id=None):
         self.token = token or settings.NOTION_TOKEN
         self.rss_db_id = rss_db_id or settings.NOTION_RSS_DB_ID
         self.content_db_id = content_db_id or settings.NOTION_CONTENT_DB_ID
-        
+
         if not self.token:
             print("Warning: Notion Token not provided")
-            
+
         self.base_url = "https://api.notion.com/v1"
         self.headers = {
             "Authorization": f"Bearer {self.token}",
@@ -27,7 +29,8 @@ class NotionService:
     def _request(self, method, endpoint, payload=None):
         url = f"{self.base_url}/{endpoint}"
         try:
-            response = requests.request(method, url, headers=self.headers, json=payload, timeout=30)
+            response = requests.request(
+                method, url, headers=self.headers, json=payload, timeout=30)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -44,10 +47,10 @@ class NotionService:
         if not self.rss_db_id:
             print("RSS Database ID missing")
             return []
-            
+
         db_id = self._format_uuid(self.rss_db_id)
         endpoint = f"databases/{db_id}/query"
-        
+
         payload = {
             "filter": {
                 "property": "Is Active",
@@ -56,34 +59,51 @@ class NotionService:
                 }
             }
         }
-        
-        data = self._request("POST", endpoint, payload)
-        if not data:
-            return []
-            
+
+        results = []
+        has_more = True
+        next_cursor = None
+
+        while has_more:
+            if next_cursor:
+                payload["start_cursor"] = next_cursor
+            data = self._request("POST", endpoint, payload)
+            if not data:
+                break
+            results.extend(data.get('results', []))
+            has_more = data.get('has_more', False)
+            next_cursor = data.get('next_cursor')
+
+
+        print(f"[DEBUG] get_active_feeds: 從 Notion API 總共撈出 {len(results)} 筆 Is Active 為 True 的資料")
+
         feeds = []
-        for page in data.get('results', []):
+        for page in results:
             props = page['properties']
-            
+
             # Extract URL
             url_obj = props.get('URL', {})
             url = url_obj.get('url') if url_obj else None
-            
+
             # Extract Name (Title)
             title_list = props.get('名稱', {}).get('title', [])
             name = title_list[0]['text']['content'] if title_list else "Unknown Source"
-            
+
             # Extract Platform (Select)
             select_prop = props.get('平台', {}).get('select')
             platform = select_prop['name'] if select_prop else "Other"
-            
+
             if url:
                 feeds.append({
-                    "id": page['id'], # Page ID for Relation
+                    "id": page['id'],  # Page ID for Relation
                     "url": url,
                     "name": name,
                     "platform": platform
                 })
+            else:
+                print(f"[DEBUG] get_active_feeds: [警告] 略過一個沒有填寫 URL 的來源 => {name} (ID: {page.get('id')})")
+                
+        print(f"[DEBUG] get_active_feeds: 最終具備有效 URL 的來源數量: {len(feeds)} 筆")
         return feeds
 
     def check_article_exists(self, url):
@@ -92,10 +112,10 @@ class NotionService:
         """
         if not self.content_db_id:
             return False
-            
+
         db_id = self._format_uuid(self.content_db_id)
         endpoint = f"databases/{db_id}/query"
-        
+
         payload = {
             "filter": {
                 "property": "URL",
@@ -105,9 +125,11 @@ class NotionService:
             },
             "page_size": 1
         }
-        
+
         data = self._request("POST", endpoint, payload)
-        return len(data.get('results', [])) > 0 if data else False
+        if data and data.get('results'):
+            return data['results'][0]['id']
+        return None
 
     def create_article(self, article_data, source_id=None):
         """
@@ -115,16 +137,16 @@ class NotionService:
         """
         if not self.content_db_id:
             return None
-            
+
         title = article_data.get('title', 'No Title')
         summary = article_data.get('summary', '')
         url = article_data.get('url', '')
         pub_date = article_data.get('published_date')
         if not pub_date:
-            pub_date = datetime.now().isoformat()
-            
+            pub_date = datetime.now(pytz.timezone('Asia/Taipei')).isoformat()
+
         platform = article_data.get('source_platform', 'Other')
-        
+
         properties = {
             "名稱": {
                 "title": [{"text": {"content": title}}]
@@ -137,7 +159,7 @@ class NotionService:
             },
 
             "Fetched Date": {
-                "rich_text": [{"text": {"content": datetime.now().isoformat()}}]
+                "rich_text": [{"text": {"content": datetime.now(pytz.timezone('Asia/Taipei')).isoformat()}}]
             },
             "Platform": {
                 "select": {"name": platform}
@@ -154,13 +176,13 @@ class NotionService:
             "AI Content": {
                 "rich_text": [{"text": {"content": article_data.get('ai_content', '')[:2000]}}]
             },
-            "status ": {
+            "Status": {
                 "select": {"name": "待處理"}
             }
         }
-        
+
         children = [
-             {
+            {
                 "object": "block",
                 "type": "heading_2",
                 "heading_2": {"rich_text": [{"text": {"content": "摘要"}}]}
@@ -171,14 +193,27 @@ class NotionService:
                 "paragraph": {"rich_text": [{"text": {"content": summary[:2000]}}]}
             }
         ]
-        
+
         payload = {
             "parent": {"database_id": self._format_uuid(self.content_db_id)},
             "properties": properties,
             "children": children
         }
-        
+
         return self._request("POST", "pages", payload)
+
+    def update_article_fetched_date(self, page_id):
+        """Update Fetched Date to current Asia/Taipei time"""
+        taipei_tz = pytz.timezone('Asia/Taipei')
+        now_str = datetime.now(taipei_tz).isoformat()
+        payload = {
+            "properties": {
+                "Fetched Date": {
+                    "rich_text": [{"text": {"content": now_str}}]
+                }
+            }
+        }
+        return self._request("PATCH", f"pages/{page_id}", payload)
 
     def update_feed_timestamp(self, page_id):
         """
@@ -217,7 +252,7 @@ class NotionService:
                 "Platform": {
                     "select": {"name": platform}
                 },
-                "status ": {
+                "Status": {
                     "select": {"name": "已分析"}
                 }
             }
@@ -226,12 +261,19 @@ class NotionService:
 
     def get_all_sources(self):
         """Fetch all sources from DB1"""
-        if not self.rss_db_id: return []
+        if not self.rss_db_id:
+            return []
         db_id = self._format_uuid(self.rss_db_id)
         endpoint = f"databases/{db_id}/query"
-        
-        # Sort by creation time desc
+
+        # Filter and Sort by creation time desc
         payload = {
+            "filter": {
+                "property": "Is Active",
+                "checkbox": {
+                    "equals": True
+                }
+            },
             "sorts": [
                 {
                     "timestamp": "created_time",
@@ -239,23 +281,41 @@ class NotionService:
                 }
             ]
         }
-        
-        data = self._request("POST", endpoint, payload)
-        if not data: return []
-        
+
+        results = []
+        has_more = True
+        next_cursor = None
+
+        while has_more:
+            if next_cursor:
+                payload["start_cursor"] = next_cursor
+            data = self._request("POST", endpoint, payload)
+            if not data:
+                break
+            results.extend(data.get('results', []))
+            has_more = data.get('has_more', False)
+            next_cursor = data.get('next_cursor')
+
+
+        print(f"[DEBUG] get_all_sources: 從 Notion API 總共撈出 {len(results)} 筆來源資料")
+
         feeds = []
-        for page in data.get('results', []):
+        for page in results:
             props = page['properties']
             url_obj = props.get('URL', {})
             url = url_obj.get('url') if url_obj else None
             title_list = props.get('名稱', {}).get('title', [])
             name = title_list[0]['text']['content'] if title_list else "Unknown"
-            
+
             # Is Active?
             is_active = props.get('Is Active', {}).get('checkbox', False)
-            
+
             # Platform
-            platform = props.get('平台', {}).get('select', {}).get('name', 'Other') if props.get('平台', {}).get('select') else 'Other'
+            platform = props.get('平台', {}).get('select', {}).get(
+                'name', 'Other') if props.get('平台', {}).get('select') else 'Other'
+
+            # --- 新增 Debug Log ---
+            print(f"[DEBUG-ALL-SOURCES] 名稱: '{name}' | URL: '{url}' | Is Active: {is_active}")
 
             if url:
                 feeds.append({
@@ -265,13 +325,17 @@ class NotionService:
                     "is_active": is_active,
                     "platform": platform
                 })
-            
+            else:
+                print(f"[DEBUG] get_all_sources: [警告] 略過一個沒有填寫 URL 的來源 => {name} (ID: {page.get('id')})")
+
+        print(f"[DEBUG] get_all_sources: 最終具備有效 URL 的來源數量: {len(feeds)} 筆")
         return feeds
 
     def create_source(self, name, url, platform="自訂", is_active=True):
         """Create a new RSS source in DB1"""
-        if not self.rss_db_id: return None
-        
+        if not self.rss_db_id:
+            return None
+
         properties = {
             "名稱": {
                 "title": [{"text": {"content": name}}]
@@ -286,15 +350,15 @@ class NotionService:
                 "checkbox": is_active
             },
             "最後抓取時間": {
-                "date": None 
+                "date": None
             }
         }
-        
+
         payload = {
             "parent": {"database_id": self._format_uuid(self.rss_db_id)},
             "properties": properties
         }
-        
+
         return self._request("POST", "pages", payload)
 
     def update_source(self, page_id, data):
@@ -302,7 +366,7 @@ class NotionService:
         properties = {}
         if 'is_active' in data:
             properties["Is Active"] = {"checkbox": data['is_active']}
-        
+
         payload = {"properties": properties}
         return self._request("PATCH", f"pages/{page_id}", payload)
 
@@ -323,106 +387,127 @@ class NotionService:
                     }
                 ]
             }
-            
-            response = self._request("POST", f"databases/{self._format_uuid(self.content_db_id)}/query", payload)
-            
+
+            response = self._request(
+                "POST", f"databases/{self._format_uuid(self.content_db_id)}/query", payload)
+
             articles = []
-            if not response: return []
-            
+            if not response:
+                return []
+
             for page in response.get('results', []):
-                props = page['properties']
-                
-                # 讀取來源
-                source_name = ''
-                if 'Source' in props:
-                    source_prop = props['Source']
-                    # 優先使用 select 格式
-                    if source_prop.get('type') == 'select' and source_prop.get('select'):
-                        source_name = source_prop['select']['name']
-                    # 相容舊的 relation 格式
-                    elif source_prop.get('type') == 'relation' and source_prop.get('relation'):
+                try:
+                    props = page.get('properties', {})
+
+                    # 讀取來源
+                    source_name = 'Unknown'
+                    source_prop = props.get('Source', {})
+                    if source_prop:
                         try:
-                            source_id = source_prop['relation'][0]['id']
-                            source_page = self.get_article(source_id)
-                            if source_page:
-                                sp_props = source_page.get('properties', {})
-                                if '名稱' in sp_props and sp_props['名稱'].get('title'):
-                                    source_name = sp_props['名稱']['title'][0]['text']['content']
-                                elif 'Name' in sp_props and sp_props['Name'].get('title'):
-                                    source_name = sp_props['Name']['title'][0]['text']['content']
+                            # 優先使用 select 格式
+                            if source_prop.get('type') == 'select' and source_prop.get('select'):
+                                source_name = source_prop['select']['name']
+                            # 相容舊的 relation 格式
+                            elif source_prop.get('type') == 'relation':
+                                relations = source_prop.get('relation', [])
+                                if relations:
+                                    source_id = relations[0].get('id')
+                                    if source_id:
+                                        source_page = self.get_article(
+                                            source_id)
+                                        if source_page:
+                                            sp_props = source_page.get(
+                                                'properties', {})
+                                            for f in ['名稱', 'Name', 'title']:
+                                                if f in sp_props and sp_props[f].get('title'):
+                                                    source_name = sp_props[f]['title'][0]['text']['content']
+                                                    break
+                            # 其他可能的文字格式 (rich_text)
+                            elif source_prop.get('type') == 'rich_text' and source_prop.get('rich_text') and isinstance(source_prop['rich_text'], list) and len(source_prop['rich_text']) > 0:
+                                source_name = source_prop['rich_text'][0]['text']['content']
+
+                            # --- 這是新增的防禦代碼：自動切除網址 ---
+                            if source_name and ' (http' in source_name:
+                                source_name = source_name.split(' (http')[0]
+                            # --------------------------------------------
                         except Exception as e:
-                            print(f"Error fetching source name from relation: {e}")
-                            source_name = "Unknown"
-                    # 其他可能的文字格式 (rich_text)
-                    elif source_prop.get('type') == 'rich_text' and source_prop.get('rich_text'):
-                        source_name = source_prop['rich_text'][0]['text']['content']
-                
-                # 讀取標題
-                title = ''
-                if '名稱' in props and props['名稱']['title']:
-                    title = props['名稱']['title'][0]['text']['content']
-                elif 'Title' in props and props['Title']['title']:
-                    title = props['Title']['title'][0]['text']['content']
-                
-                # 讀取摘要
-                summary = ''
-                if 'Summary' in props and props['Summary']['rich_text']:
-                    summary = props['Summary']['rich_text'][0]['text']['content']
-                
-                # 讀取標籤
-                topics = []
-                if 'Topic' in props:
-                    if props['Topic']['type'] == 'multi_select':
-                        topics = [tag['name'] for tag in props['Topic']['multi_select']]
-                    elif props['Topic']['type'] == 'rich_text' and props['Topic']['rich_text']:
-                        topics_str = props['Topic']['rich_text'][0]['text']['content']
-                        topics = [t.strip() for t in topics_str.split(',') if t.strip()]
-                
-                # 讀取其他欄位
-                url_obj = props.get('URL', {})
-                url = url_obj.get('url') if url_obj else ''
-                
-                published_date = ''
-                if 'Published Date' in props:
-                    if props['Published Date']['type'] == 'date' and props['Published Date']['date']:
-                        published_date = props['Published Date']['date']['start']
-                    elif props['Published Date']['type'] == 'rich_text' and props['Published Date']['rich_text']:
-                        published_date = props['Published Date']['rich_text'][0]['text']['content']
-                
-                status = '待處理'
-                # Check for "status" (lower case) or "Status" (capitalized) logic?
-                # Actually we removed "Status" from create_article, so it might not be set for new ones?
-                # Wait, we removed it because it was causing 400. That means we aren't writing status?
-                # If we aren't writing status, what are we reading?
-                # The user request says: "Status is not a property that exists". Correct.
-                # So we shouldn't try to read 'Status' property if it doesn't exist in DB schema.
-                # However, the user's provided code for get_articles *includes* reading status.
-                # "if 'status' in props ...".
-                # I will include defensive reading.
-                
-                if 'status ' in props and props.get('status ', {}).get('select'):
-                     status = props['status ']['select']['name']
-                elif 'Status' in props and props.get('Status', {}).get('status'):
-                     status = props['Status']['status']['name']
-                elif 'status' in props and props.get('status', {}).get('select'):
-                    status = props['status']['select']['name']
-                
-                articles.append({
-                    'id': page['id'],
-                    'title': title,
-                    'summary': summary,
-                    'topics': topics,
-                    'url': url,
-                    'published_date': published_date,
-                    'source': source_name,
-                    'status': status
-                })
-            
+                            print(f"解析來源名稱失敗: {e}")
+
+                    # 讀取標題
+                    title = ''
+                    for title_key in ['名稱', 'Name', 'Title']:
+                        title_prop = props.get(title_key, {})
+                        if title_prop.get('title') and isinstance(title_prop['title'], list) and len(title_prop['title']) > 0:
+                            title = title_prop['title'][0]['text']['content']
+                            break
+
+                    # 讀取摘要
+                    summary = ''
+                    summary_prop = props.get('Summary', {})
+                    if summary_prop.get('rich_text') and isinstance(summary_prop['rich_text'], list) and len(summary_prop['rich_text']) > 0:
+                        summary = summary_prop['rich_text'][0]['text']['content']
+
+                    # 讀取標籤
+                    topics = []
+                    topic_prop = props.get('Topic', {})
+                    if topic_prop.get('type') == 'multi_select':
+                        topics = [tag.get('name', '')
+                                  for tag in topic_prop.get('multi_select', [])]
+                    elif topic_prop.get('type') == 'rich_text' and topic_prop.get('rich_text') and isinstance(topic_prop['rich_text'], list) and len(topic_prop['rich_text']) > 0:
+                        topics_str = topic_prop['rich_text'][0]['text']['content']
+                        topics = [t.strip()
+                                  for t in topics_str.split(',') if t.strip()]
+
+                    # 讀取其他欄位
+                    url_obj = props.get('URL', {})
+                    url = url_obj.get('url') if url_obj else ''
+
+                    published_date = ''
+                    pub_date_prop = props.get('Published Date', {})
+                    if pub_date_prop.get('type') == 'date' and pub_date_prop.get('date'):
+                        published_date = pub_date_prop['date'].get('start', '')
+                    elif pub_date_prop.get('type') == 'rich_text' and pub_date_prop.get('rich_text') and isinstance(pub_date_prop['rich_text'], list) and len(pub_date_prop['rich_text']) > 0:
+                        published_date = pub_date_prop['rich_text'][0]['text']['content']
+
+                    fetched_date = ''
+                    fetch_date_prop = props.get('Fetched Date', {})
+                    if fetch_date_prop.get('type') == 'date' and fetch_date_prop.get('date'):
+                        fetched_date = fetch_date_prop['date'].get('start', '')
+                    elif fetch_date_prop.get('type') == 'rich_text' and fetch_date_prop.get('rich_text') and isinstance(fetch_date_prop['rich_text'], list) and len(fetch_date_prop['rich_text']) > 0:
+                        fetched_date = fetch_date_prop['rich_text'][0]['text']['content']
+
+                    # 讀取狀態
+                    status = '待處理'
+                    for status_key in ['Status', 'status']:
+                        status_prop = props.get(status_key, {})
+                        if status_prop.get('type') == 'select' and status_prop.get('select'):
+                            status = status_prop['select'].get('name', '待處理')
+                            break
+                        elif status_prop.get('type') == 'status' and status_prop.get('status'):
+                            status = status_prop['status'].get('name', '待處理')
+                            break
+
+                    articles.append({
+                        'id': page.get('id', ''),
+                        'title': title,
+                        'summary': summary,
+                        'topics': topics,
+                        'url': url,
+                        'published_date': published_date,
+                        'fetched_date': fetched_date,
+                        'source': source_name,
+                        'status': status
+                    })
+                except Exception as e:
+                    print(f"處理單一文章失敗: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
+
             return articles
-            
+
         except Exception as e:
             print(f"讀取文章失敗: {e}")
             import traceback
             traceback.print_exc()
             return []
-

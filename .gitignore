@@ -60,3 +60,5 @@ check_rss_db.py
 test_*.py
 verify_*.py
 diagnostic_*.py
+articles_data.json
+app.log

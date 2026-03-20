@@ -185,7 +185,13 @@ def is_hr_or_ai_related(title, summary, filter_type='hr'):
     hr_keywords = [
         'employee', 'talent', 'workforce', 'hr', 'human resource',
         'recruitment', 'hiring', 'leadership', 'culture', 'learning',
-        '員工', '人才', '人力資源', '招募', '領導', '文化', '培訓'
+        'management', 'organization', 'strategy', 'innovation',
+        'digital', 'business', 'productivity', 'future of work',
+        'technology', 'ai', 'workplace', 'coaching', 'model',
+        'review', 'research', 'evidence',
+        '員工', '人才', '人力資源', '招募', '領導', '文化', '培訓',
+        '管理', '組織', '策略', '創新', '數位', '商業', '生產力',
+        '科技', '人工智慧', '職場'
     ]
     
     # AI + 工作相關關鍵字
@@ -250,11 +256,9 @@ def get_feeds():
             {'id': 'josh', 'name': 'Josh Bersin Latest Insights (HR Tech)', 'url': 'https://joshbersin.com/feed/', 'is_active': True},
             {'id': 'economist', 'name': 'The Economist', 'url': 'https://www.economist.com/business/rss.xml', 'is_active': True},
             {'id': 'oxford', 'name': 'Oxford Review Podcast', 'url': 'https://feed.podbean.com/oxford-review/feed.xml', 'is_active': True},
-            {'id': 'bnext1', 'name': '數位時代 所有最新文章', 'url': 'https://www.bnext.com.tw/rss/articles', 'is_active': False},
-            {'id': 'bnext2', 'name': '數位時代 未來商務', 'url': 'https://fc.bnext.com.tw/rss', 'is_active': False},
-            {'id': 'hbr1', 'name': 'HBR (US) Human Resource Management', 'url': 'https://hbr.org/topic/human-resource-management/rss', 'is_active': False},
-            {'id': 'hbr2', 'name': 'HBR (US) Strategy', 'url': 'https://hbr.org/topic/strategy/rss', 'is_active': False},
-            {'id': 'hbr3', 'name': 'HBR (US) Leadership', 'url': 'https://hbr.org/topic/leadership/rss', 'is_active': False},
+            {'id': 'bnext1', 'name': '數位時代 所有最新文章', 'url': 'https://www.bnext.com.tw/', 'is_active': False},
+            {'id': 'bnext2', 'name': '數位時代 未來商務', 'url': 'https://fc.bnext.com.tw/', 'is_active': False},
+            {'id': 'hbr1', 'name': 'HBR (US) Human Resource Management', 'url': 'http://feeds.feedburner.com/harvardbusiness', 'is_active': False},
             {'id': '36kr', 'name': '36氪 (Lattice)', 'url': 'https://36kr.com/feed', 'is_active': True},
             {'id': 'president', 'name': 'PRESIDENT Online', 'url': 'https://president.jp/list/rss', 'is_active': True},
             {'id': 'itmedia', 'name': 'ITmedia Business', 'url': 'https://rss.itmedia.co.jp/rss/2.0/business.xml', 'is_active': True},
@@ -311,6 +315,40 @@ def fetch_status():
     except:
         return jsonify({})
 
+class DummyEntry:
+    def __init__(self, title, link, summary=""):
+        self.title = title
+        self.link = link
+        self.summary = summary
+        self.description = summary
+        self.published_parsed = datetime.now().timetuple()
+
+def scrape_bnext():
+    """使用 BeautifulSoup 直接抓取數位時代首頁文章"""
+    import requests
+    from bs4 import BeautifulSoup
+    url = "https://www.bnext.com.tw/"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+    }
+    entries = []
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            for a_tag in soup.find_all('a', href=True):
+                href = a_tag['href']
+                if '/article/' in href:
+                    title = a_tag.get('title', '').strip() or a_tag.get_text(strip=True)
+                    if title and len(title) > 5 and title != "前往內容授權":
+                        full_url = href if href.startswith('http') else f"https://www.bnext.com.tw{href}"
+                        if not any(e.link == full_url for e in entries):
+                            entries.append(DummyEntry(title=title, link=full_url))
+        return entries
+    except Exception as e:
+        print(f"Scrape Bnext error: {e}")
+        return []
+
 def perform_fetch_process():
     """Core logic to fetch and process articles"""
     notion_manager = NotionService()
@@ -353,15 +391,41 @@ def perform_fetch_process():
                     filter_type = config.get('filter', 'hr')
                     break
             
+            if 'bnext.com.tw' in url or 'oxford-review' in url:
+                filter_type = 'ai_hr'
+            
             print(f"\n[{i}/{len(sources)}] 處理來源: {name} (Filter: {filter_type})")
             
-            feed = feedparser.parse(url)
-            if not feed.entries:
-                continue
+            if 'bnext.com.tw' in url:
+                print(f"  > 使用 BeautifulSoup 抓取 Bnext 來源: {url}")
+                entries = scrape_bnext()
+                if not entries:
+                    continue
+                # Make a dummy feed object
+                class DummyFeed:
+                    pass
+                feed = DummyFeed()
+                feed.entries = entries
+            else:
+                feed = feedparser.parse(url)
+                if getattr(feed, 'entries', None) is None or not feed.entries:
+                    continue
 
             for j, entry in enumerate(feed.entries[:20], 1):
                 try:
-                    if notion_manager.check_article_exists(entry.link):
+                    art_url = entry.link
+                    try:
+                        existing_id = notion_manager.check_article_exists(art_url)
+                        if existing_id:
+                            print(f"    [{j}] 文章已存在 Notion，更新抓取日期")
+                            notion_manager.update_article_fetched_date(existing_id)
+                            existing_urls.add(art_url)
+                            continue
+                    except Exception:
+                        pass
+                        
+                    if art_url in existing_urls:
+                        print(f"    [{j}] 跳過（本地已存在）")
                         continue
                     
                     en_title = entry.title
@@ -380,9 +444,11 @@ def perform_fetch_process():
                     
                     # 日期處理
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                         pub_date = datetime(*entry.published_parsed[:6]).isoformat()
+                         dt_parsed = datetime(*entry.published_parsed[:6])
+                         dt_utc = dt_parsed.replace(tzinfo=pytz.UTC)
+                         pub_date = dt_utc.astimezone(pytz.timezone('Asia/Taipei')).isoformat()
                     else:
-                         pub_date = datetime.now().isoformat()
+                         pub_date = datetime.now(pytz.timezone('Asia/Taipei')).isoformat()
 
                     zh_title = ai_service.translate_to_chinese(en_title, "標題")
                     zh_summary = ai_service.translate_to_chinese(en_summary, "摘要")
@@ -641,11 +707,10 @@ def fetch_articles():
         # 備援來源清單（Notion 無法連線時使用）
         FALLBACK_SOURCES = [
             {'id': 'josh', 'name': 'Josh Bersin (HR Tech)', 'url': 'https://joshbersin.com/feed/', 'platform': 'HR媒體'},
-            {'id': 'hbr_hr', 'name': 'HBR Human Resource Management', 'url': 'https://hbr.org/topic/human-resource-management/rss', 'platform': 'HBR'},
-            {'id': 'hbr_lead', 'name': 'HBR Leadership', 'url': 'https://hbr.org/topic/leadership/rss', 'platform': 'HBR'},
+            {'id': 'hbr_hr', 'name': 'HBR Human Resource Management', 'url': 'http://feeds.feedburner.com/harvardbusiness', 'platform': 'HBR'},
             {'id': 'mit', 'name': 'MIT Sloan Management Review', 'url': 'https://sloanreview.mit.edu/feed/', 'platform': 'MIT Sloan'},
             {'id': 'cw', 'name': '天下雜誌', 'url': 'https://www.cw.com.tw/RSS/cw_content.xml', 'platform': '天下雜誌'},
-            {'id': 'bnext', 'name': '數位時代', 'url': 'https://www.bnext.com.tw/rss/articles', 'platform': '數位時代'},
+            {'id': 'bnext', 'name': '數位時代', 'url': 'https://www.bnext.com.tw/', 'platform': '數位時代'},
         ]
 
         # 1. 嘗試從 Notion DB1 讀取 RSS 來源，失敗時用備援清單
@@ -671,9 +736,20 @@ def fetch_articles():
                 print(f"    URL: {source.get('url')}")
                 
                 # 抓取 RSS
-                feed = feedparser.parse(source['url'])
+                url = source['url']
+                if 'bnext.com.tw' in url:
+                    print(f"  > 使用 BeautifulSoup 抓取 Bnext 來源: {url}")
+                    entries = scrape_bnext()
+                    if not entries:
+                        continue
+                    class DummyFeed:
+                        pass
+                    feed = DummyFeed()
+                    feed.entries = entries
+                else:
+                    feed = feedparser.parse(url)
                 
-                if not feed.entries:
+                if getattr(feed, 'entries', None) is None or not feed.entries:
                     print(f"  ⚠ 沒有找到文章")
                     continue
                 
@@ -682,33 +758,38 @@ def fetch_articles():
                 # 處理前 20 篇
                 for j, entry in enumerate(feed.entries[:20], 1):
                     try:
-                        # 先查本地快取是否重複
+                        # 先查是否在 Notion 中
                         art_url = entry.link
-                        if art_url in existing_urls:
-                            print(f"    [{j}] 跳過（本地已存在）")
-                            continue
-                        # 嘗試查 Notion（失敗時略過）
                         try:
-                            if notion_manager.check_article_exists(art_url):
-                                print(f"    [{j}] 跳過（Notion 已存在）")
+                            existing_id = notion_manager.check_article_exists(art_url)
+                            if existing_id:
+                                print(f"    [{j}] 文章已存在 Notion，更新抓取日期")
+                                notion_manager.update_article_fetched_date(existing_id)
                                 existing_urls.add(art_url)
                                 continue
                         except Exception:
                             pass
+
+                        if art_url in existing_urls:
+                            print(f"    [{j}] 跳過（本地已存在）")
+                            continue
 
                         print(f"    [{j}] 處理文章...")
                         en_title = entry.title
                         raw_summary = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
                         en_summary = clean_html_content(raw_summary)[:800]
 
-                        if not is_hr_article(en_title, en_summary):
-                            print(f"    [Skip] 非 HR 主題: {en_title}")
+                        current_filter_type = 'ai_hr' if ('bnext.com.tw' in url or 'oxford-review' in url) else 'hr'
+                        if not is_hr_or_ai_related(en_title, en_summary, filter_type=current_filter_type):
+                            print(f"    [Skip] 不符合主題: {en_title}")
                             continue
 
                         if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                            pub_date = datetime(*entry.published_parsed[:6]).isoformat()
+                            dt_parsed = datetime(*entry.published_parsed[:6])
+                            dt_utc = dt_parsed.replace(tzinfo=pytz.UTC)
+                            pub_date = dt_utc.astimezone(pytz.timezone('Asia/Taipei')).isoformat()
                         else:
-                            pub_date = datetime.now().isoformat()
+                            pub_date = datetime.now(pytz.timezone('Asia/Taipei')).isoformat()
 
                         print(f"        翻譯中...")
                         zh_title = ai_service.translate_to_chinese(en_title, "標題")
@@ -847,6 +928,12 @@ def list_articles():
         
         print(f"✅ 過濾後: {len(valid_articles)} 篇")
         
+        # 1. 依照 Fetched Date 降序排列 (防呆機制：若無 fetched_date 則退回 published_date 處理)
+        valid_articles.sort(key=lambda x: x.get('fetched_date') or x.get('published_date', ''), reverse=True)
+        
+        # 2. 只取前 20 筆
+        valid_articles = valid_articles[:20]
+        
         # ⚠️ 只有在有結果時才更新快取，避免空資料蓋掉本地快取
         if valid_articles:
             save_articles(valid_articles)
@@ -854,6 +941,10 @@ def list_articles():
             print("⚠️ 過濾結果為空，保留本地快取不覆蓋")
             return jsonify(load_articles())
         
+        from datetime import date
+        today = date.today().isoformat()
+        valid_articles = [a for a in valid_articles if a.get("fetched_date", "").startswith(today)]
+        valid_articles.sort(key=lambda x: x.get("fetched_date", ""), reverse=True)
         return jsonify(valid_articles)
         
     except Exception as e:
