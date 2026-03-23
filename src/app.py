@@ -394,6 +394,7 @@ def perform_fetch_process():
             if 'bnext.com.tw' in url or 'oxford-review' in url:
                 filter_type = 'ai_hr'
             
+            source_start_time = time.time()
             print(f"\n[{i}/{len(sources)}] 處理來源: {name} (Filter: {filter_type})")
             
             if 'bnext.com.tw' in url:
@@ -411,7 +412,11 @@ def perform_fetch_process():
                 if getattr(feed, 'entries', None) is None or not feed.entries:
                     continue
 
-            for j, entry in enumerate(feed.entries[:20], 1):
+            for j, entry in enumerate(feed.entries[:10], 1):
+                if time.time() - source_start_time > 30:
+                    print(f"    ⚠️ 處理來源 {name} 超過 30 秒，強制跳出保護 worker")
+                    break
+                
                 try:
                     art_url = entry.link
                     try:
@@ -732,6 +737,7 @@ def fetch_articles():
         # 2. 逐一處理每個來源
         for i, source in enumerate(sources, 1):
             try:
+                source_start_time = time.time()
                 print(f"\n[{i}/{len(sources)}] 處理來源: {source.get('name', 'Unknown')}")
                 print(f"    URL: {source.get('url')}")
                 
@@ -755,8 +761,12 @@ def fetch_articles():
                 
                 print(f"  ✓ 找到 {len(feed.entries)} 篇文章")
                 
-                # 處理前 20 篇
-                for j, entry in enumerate(feed.entries[:20], 1):
+                # 處理前 10 篇
+                for j, entry in enumerate(feed.entries[:10], 1):
+                    if time.time() - source_start_time > 30:
+                        print(f"    ⚠️ 處理來源 {source.get('name', 'Unknown')} 超過 30 秒，強制跳出保護 worker")
+                        break
+
                     try:
                         # 先查是否在 Notion 中
                         art_url = entry.link
@@ -941,10 +951,6 @@ def list_articles():
             print("⚠️ 過濾結果為空，保留本地快取不覆蓋")
             return jsonify(load_articles())
         
-        from datetime import date
-        today = date.today().isoformat()
-        valid_articles = [a for a in valid_articles if a.get("fetched_date", "").startswith(today)]
-        valid_articles.sort(key=lambda x: x.get("fetched_date", ""), reverse=True)
         return jsonify(valid_articles)
         
     except Exception as e:

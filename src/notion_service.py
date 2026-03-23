@@ -176,7 +176,7 @@ class NotionService:
             "AI Content": {
                 "rich_text": [{"text": {"content": article_data.get('ai_content', '')[:2000]}}]
             },
-            "Status": {
+            "status": {
                 "select": {"name": "待處理"}
             }
         }
@@ -252,7 +252,7 @@ class NotionService:
                 "Platform": {
                     "select": {"name": platform}
                 },
-                "Status": {
+                "status": {
                     "select": {"name": "已分析"}
                 }
             }
