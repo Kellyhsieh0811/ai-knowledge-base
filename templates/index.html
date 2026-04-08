@@ -3,99 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 知識庫 - 從RSS抓取文章</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>AI 知識庫 - 從RSS抓取文章，AI智能重製為社群內容</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* [保留妳原本強大的 CSS] */
-        :root { --primary: #0d9488; --text-primary: #1f2937; --border: #e5e7eb; }
-        body { font-family: 'Inter', sans-serif; background: #f9fafb; color: var(--text-primary); margin: 0; }
+        /* 恢復妳原本精美的 CSS 樣式 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #0d9488; --primary-dark: #0f766e; --primary-light: #5eead4;
+            --bg-gradient-from: #f9fafb; --bg-gradient-to: #e5e7eb;
+            --text-primary: #1f2937; --text-secondary: #6b7280; --border: #e5e7eb;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05); --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(to bottom right, var(--bg-gradient-from), var(--bg-gradient-to)); color: var(--text-primary); line-height: 1.5; min-height: 100vh; }
         .container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-        .btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+        .header-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.875rem; font-weight: 700; }
+        .rss-section { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+        .source-chip { padding: 0.5rem 1rem; background: white; border: 1px solid var(--border); border-radius: 8px; font-size: 0.875rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+        .source-chip.active { background: #f0fdfa; border-color: var(--primary); color: var(--primary); }
+        .btn { padding: 0.625rem 1.25rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
         .btn-primary { background: var(--primary); color: white; }
         .articles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
-        .article-card { background: white; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
-        .article-content { padding: 1.25rem; }
-        .spinner { width: 2rem; height: 2rem; border: 3px solid #eee; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .article-card { background: white; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; transition: all 0.3s; cursor: pointer; }
+        .article-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+        .article-logo-container { width: 100%; height: 160px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; padding: 24px; }
+        .source-logo { max-width: 180px; max-height: 100px; background: white; padding: 15px; border-radius: 12px; }
+        .badge { padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; }
+        .keyword-tag { padding: 0.25rem 0.625rem; background: #f0fdfa; color: var(--primary-dark); border-radius: 6px; font-size: 0.75rem; border: 1px solid #ccfbf1; margin-right: 4px; }
+        .notification { position: fixed; top: 1.5rem; right: 1.5rem; background: white; border-left: 4px solid var(--primary); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow-lg); z-index: 2000; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { transform: translateX(400px); } to { transform: translateX(0); } }
     </style>
 </head>
 <body>
     <div class="container">
-        <header class="header">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
             <div>
-                <h1>AI 知識庫</h1>
-                <p>從RSS抓取文章，AI智能重製為社群內容</p>
+                <h1 class="header-title">AI 知識庫</h1>
+                <p style="color: #6b7280;">從RSS抓取文章，AI智能重製為社群內容</p>
             </div>
-            <div>
+            <div style="display: flex; gap: 12px;">
+                <button onclick="showRSSManager()" class="btn" style="background: #6366f1; color: white;">⚙️ RSS 管理</button>
                 <button onclick="fetchRSS()" id="fetch-btn" class="btn btn-primary">📡 抓取文章</button>
             </div>
-        </header>
+        </div>
+
+        <div class="rss-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="font-size: 18px;">📡 RSS 來源管理</h3>
+                <button onclick="toggleRSSSection()" id="toggle-rss-btn" style="background:none; border:none; cursor:pointer;">收起 ▲</button>
+            </div>
+            <div id="rss-section-content">
+                <div style="margin-bottom: 15px;"><h4 style="font-size: 14px; color: #6b7280;">推薦來源：</h4><div id="suggested-sources" style="display:flex; flex-wrap:wrap; gap:8px;"></div></div>
+                <div><h4 style="font-size: 14px; color: #6b7280;">已加入來源：</h4><div id="added-sources" style="display:flex; flex-wrap:wrap; gap:8px;"></div></div>
+            </div>
+        </div>
 
         <div id="articles-container">
-            <div style="display:flex; justify-content:center; padding: 50px;">
-                <div class="spinner"></div>
-            </div>
+            <div style="text-align:center; padding:50px;">載入中...</div>
         </div>
     </div>
 
     <script>
         let articles = [];
 
-        // 核心載入函數
+        // 【關鍵修復】初始化函數：確保網頁元素與資料同步
         async function loadInitialData() {
-            console.log("🚀 執行初始化...");
-            await loadArticles();
+            console.log("🚀 全功能版初始化中...");
+            await Promise.all([
+                loadArticles(),
+                loadRSSSources()
+            ]);
         }
 
         async function loadArticles() {
             try {
                 const response = await fetch(`/api/articles?t=${Date.now()}`);
-                articles = await response.json();
+                const data = await response.json();
+                articles = Array.isArray(data) ? data : [];
                 renderArticles();
-            } catch (err) {
-                console.error("載入失敗:", err);
-            }
+            } catch (err) { console.error("文章載入失敗", err); }
+        }
+
+        async function loadRSSSources() {
+            try {
+                const response = await fetch('/api/feeds');
+                const data = await response.json();
+                if (data.success) {
+                    renderRSSUI(data);
+                }
+            } catch (err) { console.error("RSS 載入失敗", err); }
+        }
+
+        function renderRSSUI(data) {
+            const addedContainer = document.getElementById('added-sources');
+            const sources = data.rss_sources || [];
+            addedContainer.innerHTML = sources.map(s => `
+                <div class="source-chip active">${s.name} <span style="font-size:10px;">✕</span></div>
+            `).join('');
         }
 
         async function fetchRSS() {
             const btn = document.getElementById('fetch-btn');
-            btn.disabled = true;
-            btn.innerText = '⏳ 抓取中...';
+            btn.disabled = true; btn.innerText = '⏳ 抓取中...';
+            showNotification("正在從雲端抓取最新 HR 文章...", "info");
             try {
                 const response = await fetch('/api/rss/fetch', { method: 'POST' });
                 const data = await response.json();
-                alert(data.message || "抓取成功");
+                showNotification(data.message || "抓取成功！", "success");
                 await loadArticles();
-            } catch (err) {
-                alert("抓取失敗");
-            } finally {
-                btn.disabled = false;
-                btn.innerText = '📡 抓取文章';
-            }
+            } catch (err) { showNotification("抓取失敗", "error"); }
+            finally { btn.disabled = false; btn.innerText = '📡 抓取文章'; }
         }
 
         function renderArticles() {
             const container = document.getElementById('articles-container');
-            if (!articles || articles.length === 0) {
-                container.innerHTML = '<p>目前沒有文章，請點擊抓取。</p>';
-                return;
-            }
+            if (!articles.length) { container.innerHTML = '<p>暫無文章</p>'; return; }
             container.innerHTML = `
                 <div class="articles-grid">
                     ${articles.map(a => `
                         <div class="article-card">
-                            <div class="article-content">
-                                <h3>${a.title}</h3>
-                                <p style="font-size: 0.9rem; color: #666;">${a.summary}</p>
-                                <a href="${a.url}" target="_blank">查看原文</a>
+                            <div class="article-logo-container">
+                                <div style="background:white; padding:10px; border-radius:8px; font-weight:bold; color:var(--primary);">${a.source || 'News'}</div>
+                            </div>
+                            <div style="padding:1.25rem;">
+                                <div style="margin-bottom:8px;"><span class="badge" style="background:#f0fdfa; color:var(--primary);">${a.source_platform || '媒體'}</span></div>
+                                <h3 style="margin-bottom:10px; font-size:1.1rem;">${a.title}</h3>
+                                <p style="font-size:0.875rem; color:#6b7280; margin-bottom:15px;">${a.summary.substring(0, 100)}...</p>
+                                <div style="margin-bottom:15px;">
+                                    ${(a.topics || []).slice(0, 3).map(t => `<span class="keyword-tag">${t}</span>`).join('')}
+                                </div>
+                                <div style="display:flex; gap:8px;">
+                                    <a href="${a.url}" target="_blank" class="btn" style="flex:1; border:1px solid var(--border); text-decoration:none; justify-content:center; font-size:0.8rem;">原文</a>
+                                    <button class="btn btn-primary" style="flex:1; font-size:0.8rem; justify-content:center;">✨ AI 重製</button>
+                                </div>
                             </div>
                         </div>
                     `).join('')}
                 </div>`;
         }
 
-        // 初始化
+        function showNotification(msg, type) {
+            const div = document.createElement('div');
+            div.className = 'notification';
+            div.innerText = msg;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        function toggleRSSSection() {
+            const content = document.getElementById('rss-section-content');
+            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function showRSSManager() {
+            document.getElementById('rss-section-content').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 確保頁面載入後執行
         window.onload = loadInitialData;
     </script>
 </body>
