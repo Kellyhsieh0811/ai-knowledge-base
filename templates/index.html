@@ -1070,6 +1070,31 @@
             { id: 'mit', name: 'MIT Sloan', platform: 'MIT Sloan', url: 'https://sloanreview.mit.edu/feed/' }
         ];
 
+        // ===== 共用 RSS 來源清單 (前後端共用的 fallback) =====
+        const MASTER_FEEDS = [
+            // 已加入（is_active: true）
+            { id: 'cw1',         name: '天下雜誌 管理頻道',                    url: 'https://www.cw.com.tw/RSS/cw_content.xml',                             is_active: true  },
+            { id: 'cw2',         name: '天下雜誌 職場頻道',                    url: 'https://www.cw.com.tw/RSS/cw_content.xml',                             is_active: true  },
+            { id: 'bnext1',      name: '數位時代 所有最新文章',                  url: 'https://www.bnext.com.tw/rss/articles',                               is_active: true  },
+            { id: 'bnext2',      name: '數位時代 未來商務',                     url: 'https://fc.bnext.com.tw/rss',                                         is_active: true  },
+            { id: 'hbr1',        name: 'HBR (US) Human Resource Management',  url: 'https://hbr.org/topic/human-resource-management/rss',                 is_active: true  },
+            { id: 'hbr2',        name: 'HBR (US) Strategy',                   url: 'https://hbr.org/topic/strategy/rss',                                  is_active: true  },
+            { id: 'hbr3',        name: 'HBR (US) Leadership',                 url: 'https://hbr.org/topic/leadership/rss',                                is_active: true  },
+            { id: 'josh',        name: 'Josh Bersin Latest Insights (HR Tech)',url: 'https://joshbersin.com/feed/',                                        is_active: true  },
+            { id: 'oxford',      name: 'Oxford Review Podcast',               url: 'https://feed.podbean.com/oxford-review/feed.xml',                     is_active: true  },
+            { id: 'economist',   name: 'The Economist',                       url: 'https://www.economist.com/business/rss.xml',                          is_active: true  },
+            { id: '36kr',        name: '36氪 (Lattice)',                       url: 'https://36kr.com/feed',                                               is_active: true  },
+            { id: 'president',   name: 'PRESIDENT Online',                    url: 'https://president.jp/list/rss',                                       is_active: true  },
+            { id: 'itmedia',     name: 'ITmedia Business',                    url: 'https://rss.itmedia.co.jp/rss/2.0/business.xml',                      is_active: true  },
+            { id: 'nikkei',      name: '日経中文網',                            url: 'https://zh.cn.nikkei.com/rss.xml',                                   is_active: true  },
+            { id: 'handelsblatt',name: 'Handelsblatt',                        url: 'https://www.handelsblatt.com/contentexport/feed/top-themen',          is_active: true  },
+            { id: 'ainews',      name: 'AI News',                             url: 'https://www.artificialintelligence-news.com/feed/',                   is_active: true  },
+            // 推薦來源（is_active: false）
+            { id: 'shrm',        name: 'SHRM',                                url: 'https://www.shrm.org/resourcesandtools/hr-topics/pages/rss.aspx',     is_active: false },
+            { id: 'hr_tech',     name: 'HR Technologist',                     url: 'https://www.hrtechnologist.com/feed/',                                is_active: false },
+            { id: 'workday',     name: 'Workday Blog',                        url: 'https://blog.workday.com/en-us/feed.xml',                             is_active: false },
+        ];
+
         let feeds = [];
         let articles = [];
         let currentArticle = null;
@@ -1134,41 +1159,45 @@
 
         // Load RSS Sources
         async function loadRSSSources() {
+            let addedSources   = MASTER_FEEDS.filter(f => f.is_active);
+            let suggestedSources = MASTER_FEEDS.filter(f => !f.is_active);
+
+            // 嘗試從後端取得最新狀態，失敗就用 hardcoded fallback
             try {
                 const response = await fetch('/api/feeds');
+                const contentType = response.headers.get('content-type') || '';
+                if (!response.ok || !contentType.includes('application/json')) {
+                    throw new Error(`API 回傳非 JSON（${response.status}）`);
+                }
                 const data = await response.json();
-
-                if (!data.success) {
-                    console.error('載入 RSS 來源失敗');
-                    return;
+                if (data.success && (data.rss_sources || data.added_sources)) {
+                    addedSources     = data.rss_sources || data.added_sources || addedSources;
+                    suggestedSources = data.suggested_sources || suggestedSources;
                 }
-
-                // 渲染推薦來源
-                const suggestedContainer = document.getElementById('suggested-sources');
-                if (suggestedContainer && data.suggested_sources) {
-                    suggestedContainer.innerHTML = data.suggested_sources.map(source => `
-                        <button onclick="toggleSource('${source.id}')" 
-                                style="padding: 8px 16px; background: white; border: 1px solid #e5e7eb; color: #374151; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.2s;">
-                            ${source.name} +
-                        </button>
-                    `).join('');
-                }
-
-                // 渲染已加入來源
-                const addedContainer = document.getElementById('added-sources');
-                // NOTE: data.rss_sources maps to added sources from backend
-                const addedSources = data.rss_sources || data.added_sources;
-                if (addedContainer && addedSources) {
-                    addedContainer.innerHTML = addedSources.map(source => `
-                        <button onclick="toggleSource('${source.id}')" 
-                                style="padding: 8px 16px; background: #0d9488; border: none; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                            ${source.name} <span style="font-size: 12px;">✕</span>
-                        </button>
-                    `).join('');
-                }
-
             } catch (error) {
-                console.error('載入 RSS 來源錯誤:', error);
+                console.log('📌 /api/feeds 無法連線，使用預設來源列表');
+            }
+
+            // 渲染推薦來源
+            const suggestedContainer = document.getElementById('suggested-sources');
+            if (suggestedContainer) {
+                suggestedContainer.innerHTML = suggestedSources.map(source => `
+                    <button onclick="toggleSource('${source.id}')"
+                            style="padding: 8px 16px; background: white; border: 1px solid #e5e7eb; color: #374151; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.2s;">
+                        ${source.name} +
+                    </button>
+                `).join('');
+            }
+
+            // 渲染已加入來源
+            const addedContainer = document.getElementById('added-sources');
+            if (addedContainer) {
+                addedContainer.innerHTML = addedSources.map(source => `
+                    <button onclick="toggleSource('${source.id}')"
+                            style="padding: 8px 16px; background: #0d9488; border: none; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                        ${source.name} <span style="font-size: 12px;">✕</span>
+                    </button>
+                `).join('');
             }
         }
 
@@ -1974,26 +2003,7 @@
         // 顯示 RSS 管理介面
         async function showRSSManager() {
             try {
-                // 暫時使用硬編碼的 RSS 列表
-                const hardcodedFeeds = [
-                    { id: 'cw1', name: '天下雜誌 管理頻道', url: 'https://www.cw.com.tw/RSS/cw_content.xml', is_active: true },
-                    { id: 'cw2', name: '天下雜誌 職場頻道', 'url': 'https://www.cw.com.tw/RSS/cw_content.xml', is_active: true },
-                    { id: 'bnext1', name: '數位時代 所有最新文章', url: 'https://www.bnext.com.tw/rss/articles', is_active: false },
-                    { id: 'bnext2', name: '數位時代 未來商務', url: 'https://fc.bnext.com.tw/rss', is_active: false },
-                    { id: 'hbr1', name: 'HBR (US) Human Resource Management', url: 'https://hbr.org/topic/human-resource-management/rss', is_active: false },
-                    { id: 'hbr2', name: 'HBR (US) Strategy', url: 'https://hbr.org/topic/strategy/rss', is_active: false },
-                    { id: 'hbr3', name: 'HBR (US) Leadership', url: 'https://hbr.org/topic/leadership/rss', is_active: false },
-                    { id: 'josh', name: 'Josh Bersin Latest Insights (HR Tech)', url: 'https://joshbersin.com/feed/', is_active: true },
-                    { id: 'oxford', name: 'Oxford Review', url: 'https://feed.podbean.com/oxford-review/feed.xml', is_active: true },
-                    { id: 'economist', name: 'The Economist', 'url': 'https://www.economist.com/business/rss.xml', is_active: true },
-                    { id: '36kr', name: '36氪 (Lattice)', url: 'https://36kr.com/feed', is_active: true },
-                    { id: 'president', 'name': 'PRESIDENT Online', url: 'https://president.jp/list/rss', is_active: true },
-                    { id: 'itmedia', name: 'ITmedia Business', url: 'https://rss.itmedia.co.jp/rss/2.0/business.xml', is_active: true },
-                    { id: 'nikkei', name: '日経中文網', url: 'https://zh.cn.nikkei.com/rss.xml', is_active: true },
-                    { id: 'handelsblatt', name: 'Handelsblatt', url: 'https://www.handelsblatt.com/contentexport/feed/top-themen', is_active: true },
-                    { id: 'shrm', name: 'SHRM', url: 'https://www.shrm.org/resourcesandtools/hr-topics/pages/rss.aspx', is_active: false },
-                    { id: 'ainews', name: 'AI News', 'url': 'https://www.artificialintelligence-news.com/feed/', is_active: true }
-                ];
+                const feedsToShow = MASTER_FEEDS;
 
                 // 建立管理介面
                 const modalHTML = `
@@ -2020,7 +2030,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${hardcodedFeeds.map(feed => `
+                                    ${feedsToShow.map(feed => `
                                         <tr style="border-bottom: 1px solid #e5e7eb;">
                                             <td style="padding: 12px; font-weight: 500;">${feed.name}</td>
                                             <td style="padding: 12px; font-size: 12px; color: #6b7280; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -2087,7 +2097,7 @@
             }
         }
         // Initialize
-        loadInitialData();
+        // 初始化由上方 DOMContentLoaded 事件處理，此處不需重複呼叫
     </script>
 </body>
 
