@@ -1,37 +1,102 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 知識庫 - 從RSS抓取文章，AI智能重製為社群內容</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>AI 知識庫 - 從RSS抓取文章</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* [保留妳原本強大的 CSS 樣式] */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --primary: #0d9488; --primary-dark: #0f766e; --primary-light: #5eead4;
-            --bg-gradient-from: #f9fafb; --bg-gradient-to: #e5e7eb; --bg-white: #ffffff;
-            --text-primary: #1f2937; --text-secondary: #6b7280; --text-muted: #9ca3af;
-            --border: #e5e7eb; --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1); --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-        body { font-family: 'Inter', sans-serif; background: linear-gradient(to bottom right, var(--bg-gradient-from), var(--bg-gradient-to)); color: var(--text-primary); line-height: 1.5; min-height: 100vh; }
+        /* [保留妳原本強大的 CSS] */
+        :root { --primary: #0d9488; --text-primary: #1f2937; --border: #e5e7eb; }
+        body { font-family: 'Inter', sans-serif; background: #f9fafb; color: var(--text-primary); margin: 0; }
         .container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
-        .header-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.875rem; font-weight: 700; color: var(--text-primary); }
-        .header-icon { width: 2rem; height: 2rem; color: var(--primary); }
-        .header-subtitle { color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; }
-        .rss-section { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
-        .source-chip { padding: 0.5rem 1rem; background: white; border: 1px solid var(--border); border-radius: 8px; font-size: 0.875rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.5rem; }
-        .source-chip:hover, .source-chip.active { border-color: var(--primary); background: #f0fdfa; color: var(--primary); }
-        .btn { padding: 0.625rem 1.25rem; border-radius: 8px; border: none; font-weight: 600; font-size: 0.875rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
         .btn-primary { background: var(--primary); color: white; }
-        .btn-outline { background: white; color: var(--text-primary); border: 1px solid var(--border); }
-        .search-filter-bar { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
-        .search-wrapper { flex: 1; min-width: 250px; position: relative; }
-        .search-input { width: 100%; padding: 0.625rem 1rem 0.625rem 2.5rem; border: 1px solid var(--border); border-radius: 8px; }
-        .search-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
-        .select { padding: 0.625rem 2rem 0.625rem 1rem; border: 1px solid var(--border); border-radius: 8px; appearance: none; background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") no-repeat right 0.5rem center; background-size: 1.25rem; }
-        .stats-tabs { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
-        .tabs { background: #f3f4f6; border-radius: 8px; padding: 0.25rem; }
-        .tab { padding: 0.375rem
+        .articles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
+        .article-card { background: white; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+        .article-content { padding: 1.25rem; }
+        .spinner { width: 2rem; height: 2rem; border: 3px solid #eee; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div>
+                <h1>AI 知識庫</h1>
+                <p>從RSS抓取文章，AI智能重製為社群內容</p>
+            </div>
+            <div>
+                <button onclick="fetchRSS()" id="fetch-btn" class="btn btn-primary">📡 抓取文章</button>
+            </div>
+        </header>
+
+        <div id="articles-container">
+            <div style="display:flex; justify-content:center; padding: 50px;">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let articles = [];
+
+        // 核心載入函數
+        async function loadInitialData() {
+            console.log("🚀 執行初始化...");
+            await loadArticles();
+        }
+
+        async function loadArticles() {
+            try {
+                const response = await fetch(`/api/articles?t=${Date.now()}`);
+                articles = await response.json();
+                renderArticles();
+            } catch (err) {
+                console.error("載入失敗:", err);
+            }
+        }
+
+        async function fetchRSS() {
+            const btn = document.getElementById('fetch-btn');
+            btn.disabled = true;
+            btn.innerText = '⏳ 抓取中...';
+            try {
+                const response = await fetch('/api/rss/fetch', { method: 'POST' });
+                const data = await response.json();
+                alert(data.message || "抓取成功");
+                await loadArticles();
+            } catch (err) {
+                alert("抓取失敗");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '📡 抓取文章';
+            }
+        }
+
+        function renderArticles() {
+            const container = document.getElementById('articles-container');
+            if (!articles || articles.length === 0) {
+                container.innerHTML = '<p>目前沒有文章，請點擊抓取。</p>';
+                return;
+            }
+            container.innerHTML = `
+                <div class="articles-grid">
+                    ${articles.map(a => `
+                        <div class="article-card">
+                            <div class="article-content">
+                                <h3>${a.title}</h3>
+                                <p style="font-size: 0.9rem; color: #666;">${a.summary}</p>
+                                <a href="${a.url}" target="_blank">查看原文</a>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>`;
+        }
+
+        // 初始化
+        window.onload = loadInitialData;
+    </script>
+</body>
+</html>
