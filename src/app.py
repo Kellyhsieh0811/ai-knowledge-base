@@ -68,44 +68,64 @@ def clean_html_content(html_content):
 def is_hr_or_ai_related(title, summary, filter_type='hr'):
     content = (title + ' ' + summary).lower()
 
-    hr_keywords = [
-        'employee', 'talent', 'workforce', 'hr', 'human resource',
-        'recruitment', 'hiring', 'leadership', 'culture', 'learning',
-        'management', 'organization', 'strategy', 'innovation',
-        'digital', 'business', 'productivity', 'future of work',
-        'technology', 'ai', 'workplace', 'coaching', 'model',
-        'review', 'research', 'evidence',
-        '員工', '人才', '人力資源', '招募', '領導', '文化', '培訓',
-        '管理', '組織', '策略', '創新', '數位', '商業', '生產力',
-        '科技', '人工智慧', '職場'
+    # ─── 第一關：硬排除（有這些就直接丟掉）───
+    hard_exclude = [
+        # 金融/投資
+        'ipo', '上市', '融資', '估值', '股票', '期貨', '加密貨幣', '比特幣', '區塊鏈',
+        'cryptocurrency', 'blockchain', 'bitcoin', 'stock market', 'fund raising',
+        # 產品/硬體（非 HR）
+        '床墊', '感測器', '半導體', '晶片', '電動車', '機器人硬體',
+        'semiconductor', 'chip', 'electric vehicle',
+        # 媒體/娛樂
+        '電視網', '收視率', 'z世代觀眾', 'gen z viewer', 'fox news',
+        # 個人傳記/故事
+        '訃聞', '傳記', 'obituary',
+        # 醫療美容
+        '醫美', '整形',
+    ]
+    if any(kw in content for kw in hard_exclude):
+        return False
+
+    # ─── 第二關：HR 核心關鍵字（至少要有 1 個）───
+    hr_core = [
+        # 英文
+        'employee', 'talent', 'workforce', 'hr ', 'human resource',
+        'recruitment', 'hiring', 'onboarding', 'retention',
+        'leadership', 'culture', 'engagement', 'wellbeing', 'well-being',
+        'diversity', 'inclusion', 'dei',
+        'performance', 'training', 'learning', 'development', 'coaching',
+        'compensation', 'salary', 'benefits',
+        'future of work', 'workplace', 'remote work', 'hybrid work',
+        'organization', 'team', 'manager', 'executive',
+        # 中文
+        '員工', '人才', '人力資源', '人資', '招募', '留任',
+        '領導力', '企業文化', '敬業度', '多元共融',
+        '績效', '培訓', '學習發展', '薪酬', '福利',
+        '職場', '遠距工作', '混合辦公', '未來工作',
+        '組織', '管理者', '主管', '團隊建立',
+        # 日文 HR 常見詞
+        '人材', '採用', 'リーダーシップ', '組織文化', '従業員',
     ]
 
+    # ─── AI + 工作相關（ai_hr 來源專用）───
     ai_work_keywords = [
-        'ai colleague', 'ai coworker', 'ai assistant',
-        'frontier model', 'llm', 'large language model',
-        'generative ai', 'chatgpt', 'claude', 'gemini',
         'ai in workplace', 'ai productivity', 'ai automation',
         'future of work', 'digital transformation',
-        'ai 同事', 'ai 助手', '生成式 ai', '大型語言模型',
-        '前沿模型', '工作場所 ai', 'ai 生產力', '人工智慧'
+        'generative ai', 'llm', 'large language model',
+        'ai colleague', 'ai assistant', 'ai coworker',
+        '人工智慧.*職場', '職場.*人工智慧',
+        'ai 生產力', 'ai 工作', '生成式 ai',
     ]
-
-    exclude_keywords = [
-        'cryptocurrency', 'blockchain', 'bitcoin', 'stock market',
-        '加密貨幣', '區塊鏈', '比特幣', '股市', '醫美'
-    ]
-
-    if any(keyword in content for keyword in exclude_keywords):
-        return False
 
     if filter_type == 'hr':
-        return any(keyword in content for keyword in hr_keywords)
+        return any(kw in content for kw in hr_core)
+
     elif filter_type == 'ai_hr':
-        has_ai = any(keyword in content for keyword in ai_work_keywords)
-        has_hr = any(keyword in content for keyword in hr_keywords)
-        if has_ai:
-            return has_hr or 'work' in content or 'employee' in content or '工作' in content
-        return False
+        has_hr = any(kw in content for kw in hr_core)
+        has_ai_work = any(kw in content for kw in ai_work_keywords)
+        # AI 來源：必須同時有 AI 工作關鍵字 + HR 核心關鍵字
+        # 或者直接有 HR 核心關鍵字也可以
+        return has_hr or (has_ai_work and ('work' in content or '工作' in content or '員工' in content))
 
     return False
 
