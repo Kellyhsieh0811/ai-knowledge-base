@@ -1506,11 +1506,12 @@
                     return false;
                 }
 
-                // 2. 檢查是否有允許的標籤 (Whitelist Check)
+                // 2. 沒有標籤的文章直接放行（後端已做過濾）
                 if (!article.keywords || article.keywords.length === 0) {
-                    return false;
+                    return true;
                 }
 
+                // 3. 有標籤時，至少要有一個允許的標籤
                 const hasValidTag = article.keywords.some(tag =>
                     allowedTags.includes(tag)
                 );
