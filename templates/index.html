@@ -1225,6 +1225,17 @@
             });
         }
 
+        function parseArticleDate(dateString) {
+            if (!dateString || dateString === 'undefined') return null;
+            // ISO 格式
+            const d = new Date(dateString);
+            if (!isNaN(d.getTime())) return d;
+            // 中文格式：2026年2月11日
+            const m = dateString.match(/(\d+)年(\d+)月(\d+)日/);
+            if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+            return null;
+        }
+
         function formatDate(dateString) {
             if (!dateString || dateString === 'undefined') {
                 return '未知日期';
@@ -1504,47 +1515,58 @@
                 '市場拓展', '品牌管理', '供應鏈', '股票', '期貨', '投資'
             ];
 
+            // 本週起始時間（週一 00:00）
+            const now = new Date();
+            const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1; // 週一=0
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - dayOfWeek);
+            weekStart.setHours(0, 0, 0, 0);
+
             const initialArticles = filteredArticles.length > 0 ? filteredArticles : (document.getElementById('search-input').value ? [] : articles);
 
-            // ✅ 雙重過濾機制 (Double Insurance Filtering)
-            const displayArticles = initialArticles.filter(article => {
-                // 1. 檢查標題是否包含不允許的關鍵字
+            // 先過濾內容
+            let displayArticles = initialArticles.filter(article => {
                 const hasBlockedKeyword = blockedKeywords.some(keyword =>
                     (article.title || '').includes(keyword)
                 );
+                if (hasBlockedKeyword) return false;
 
-                if (hasBlockedKeyword) {
-                    console.log(`🚫 過濾關鍵字文章: ${article.title}`);
-                    return false;
-                }
+                if (!article.keywords || article.keywords.length === 0) return true;
 
-                // 2. 沒有標籤的文章直接放行（後端已做過濾）
-                if (!article.keywords || article.keywords.length === 0) {
-                    return true;
-                }
-
-                // 3. 有標籤時，至少要有一個允許的標籤
-                const hasValidTag = article.keywords.some(tag =>
-                    allowedTags.includes(tag)
-                );
-
+                const hasValidTag = article.keywords.some(tag => allowedTags.includes(tag));
                 if (!hasValidTag) {
-                    console.log(`⚠️ 過濾無效標籤文章: ${article.title} (${article.keywords})`);
+                    console.log(`⚠️ 過濾無效標籤文章: ${article.title}`);
                     return false;
                 }
-
                 return true;
             });
 
-            const countEl = document.getElementById('total-count');
-            if (countEl) countEl.textContent = displayArticles.length;
+            // 按日期排序（最新在前）
+            displayArticles.sort((a, b) => {
+                const dateA = parseArticleDate(a.publish_date);
+                const dateB = parseArticleDate(b.publish_date);
+                return dateB - dateA;
+            });
 
-            if (displayArticles.length === 0) {
+            // 只顯示本週文章（有日期的才過濾，沒日期的保留）
+            const thisWeekArticles = displayArticles.filter(article => {
+                const d = parseArticleDate(article.publish_date);
+                if (!d) return true; // 沒日期的保留
+                return d >= weekStart;
+            });
+
+            // 如果本週完全沒有文章，顯示空狀態
+            const finalArticles = thisWeekArticles;
+
+            const countEl = document.getElementById('total-count');
+            if (countEl) countEl.textContent = finalArticles.length;
+
+            if (finalArticles.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">📚</div>
-                        <div class="empty-title">沒有有效的文章</div>
-                        <div class="empty-subtitle">請重新抓取文章</div>
+                        <div class="empty-title">本週尚無文章</div>
+                        <div class="empty-subtitle">請點擊「抓取文章」取得最新內容</div>
                     </div>
                 `;
                 return;
@@ -1566,7 +1588,7 @@
 
             container.innerHTML = `
                 <div class="articles-grid">
-                    ${displayArticles.map(article => {
+                    ${finalArticles.map(article => {
                 const articleUrl = article.source_url || article.url;
                 const hasUrl = articleUrl && articleUrl !== 'undefined';
 
