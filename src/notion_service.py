@@ -199,23 +199,27 @@ class NotionService:
     def update_feed_timestamp(self, page_id):
         """
         Update '最後抓取時間' in Database 1 (RSS Feeds)
-        ✅ Bug 1 fix: 欄位型別是 date，改用 ISO 8601 格式寫入
+        欄位型別是 rich_text
         """
         taipei_tz = pytz.timezone('Asia/Taipei')
-        now_iso = datetime.now(taipei_tz).isoformat()
+        now_str = datetime.now(taipei_tz).strftime("%Y-%m-%d %H:%M:%S")
         endpoint = f"pages/{page_id}"
         payload = {
             "properties": {
                 "最後抓取時間": {
-                    "date": {
-                        "start": now_iso
-                    }
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": now_str
+                            }
+                        }
+                    ]
                 }
             }
         }
         result = self._request("PATCH", endpoint, payload)
         if result:
-            print(f"  ✅ 更新最後抓取時間成功: {now_iso[:19]}")
+            print(f"  ✅ 更新最後抓取時間成功: {now_str}")
         else:
             print(f"  ⚠️ 更新最後抓取時間失敗 (page_id: {page_id})")
         return result
