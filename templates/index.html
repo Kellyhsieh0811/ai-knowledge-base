@@ -1225,18 +1225,30 @@
             });
         }
 
-        // 格式化日期
         function formatDate(dateString) {
             if (!dateString || dateString === 'undefined') {
                 return '未知日期';
             }
             try {
+                // 先嘗試 ISO 格式（新文章）
                 const date = new Date(dateString);
-                if (isNaN(date.getTime())) return '未知日期';
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}/${month}/${day}`;
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}/${month}/${day}`;
+                }
+
+                // 再嘗試中文格式：2026年2月11日 下午5:57 (GMT+8)
+                const chineseMatch = dateString.match(/(\d+)年(\d+)月(\d+)日/);
+                if (chineseMatch) {
+                    const year = chineseMatch[1];
+                    const month = String(parseInt(chineseMatch[2])).padStart(2, '0');
+                    const day = String(parseInt(chineseMatch[3])).padStart(2, '0');
+                    return `${year}/${month}/${day}`;
+                }
+
+                return '未知日期';
             } catch (e) {
                 return '未知日期';
             }
@@ -1258,7 +1270,7 @@
                         source: article.source,
                         source_platform: article.source_platform || article.source,
                         source_url: article.source_url || article.url,
-                        publish_date: article.published_date, // Fixed: Map from API 'published_date'
+                        publish_date: article.published_date || article.fetched_date || '',
                         keywords: article.topics || [],
                         status: article.status || 'pending',
                         ai_content: article.ai_content
