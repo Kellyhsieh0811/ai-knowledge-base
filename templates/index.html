@@ -1282,6 +1282,7 @@
                         source_platform: article.source_platform || article.source,
                         source_url: article.source_url || article.url,
                         publish_date: article.published_date || article.fetched_date || '',
+                        fetched_date: article.fetched_date || '',
                         keywords: article.topics || [],
                         status: article.status || 'pending',
                         ai_content: article.ai_content
@@ -1548,9 +1549,10 @@
                 return dateB - dateA;
             });
 
-            // 只顯示本週文章（有日期的才過濾，沒日期的保留）
+            // 只顯示本週文章（用 fetched_date 判斷，沒有則用 publish_date）
             const thisWeekArticles = displayArticles.filter(article => {
-                const d = parseArticleDate(article.publish_date);
+                const fetchedDate = article.fetched_date || article.publish_date;
+                const d = parseArticleDate(fetchedDate);
                 if (!d) return true; // 沒日期的保留
                 return d >= weekStart;
             });
