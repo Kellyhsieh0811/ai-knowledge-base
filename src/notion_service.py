@@ -345,114 +345,116 @@ class NotionService:
     def get_articles(self, filters=None):
         """從 Notion Database 2 讀取文章"""
         try:
-            payload = {
-                "sorts": [
-                    {
-                        "property": "Published Date",
-                        "direction": "descending"
-                    }
-                ]
-            }
-
-            response = self._request(
-                "POST",
-                f"databases/{self._format_uuid(self.content_db_id)}/query",
-                payload
-            )
+            # 不在 Notion 端排序（因為 Published Date / Fetched Date 是 rich_text，Notion 無法正確排序）
+            # 改由 Python 端排序
+            payload = {}
 
             articles = []
-            if not response:
-                return []
+            has_more = True
+            next_cursor = None
 
-            for page in response.get('results', []):
-                try:
-                    props = page.get('properties', {})
+            while has_more:
+                if next_cursor:
+                    payload["start_cursor"] = next_cursor
+                response = self._request(
+                    "POST",
+                    f"databases/{self._format_uuid(self.content_db_id)}/query",
+                    payload
+                )
+                if not response:
+                    break
+                has_more = response.get('has_more', False)
+                next_cursor = response.get('next_cursor')
 
-                    # 讀取來源
-                    source_name = 'Unknown'
-                    source_prop = props.get('Source', {})
-                    if source_prop:
-                        try:
-                            if source_prop.get('type') == 'select' and source_prop.get('select'):
-                                source_name = source_prop['select']['name']
-                            elif source_prop.get('type') == 'rich_text' and source_prop.get('rich_text'):
-                                source_name = source_prop['rich_text'][0]['text']['content']
-                            if source_name and ' (http' in source_name:
-                                source_name = source_name.split(' (http')[0]
-                        except Exception as e:
-                            print(f"解析來源名稱失敗: {e}")
+                for page in response.get('results', []):
+                    try:
+                        props = page.get('properties', {})
 
-                    # 讀取標題
-                    title = ''
-                    for title_key in ['名稱', 'Name', 'Title']:
-                        title_prop = props.get(title_key, {})
-                        if title_prop.get('title') and len(title_prop['title']) > 0:
-                            title = title_prop['title'][0]['text']['content']
-                            break
+                        # 讀取來源
+                        source_name = 'Unknown'
+                        source_prop = props.get('Source', {})
+                        if source_prop:
+                            try:
+                                if source_prop.get('type') == 'select' and source_prop.get('select'):
+                                    source_name = source_prop['select']['name']
+                                elif source_prop.get('type') == 'rich_text' and source_prop.get('rich_text'):
+                                    source_name = source_prop['rich_text'][0]['text']['content']
+                                if source_name and ' (http' in source_name:
+                                    source_name = source_name.split(' (http')[0]
+                            except Exception as e:
+                                print(f"解析來源名稱失敗: {e}")
 
-                    # 讀取摘要
-                    summary = ''
-                    summary_prop = props.get('Summary', {})
-                    if summary_prop.get('rich_text') and len(summary_prop['rich_text']) > 0:
-                        summary = summary_prop['rich_text'][0]['text']['content']
+                        # 讀取標題
+                        title = ''
+                        for title_key in ['名稱', 'Name', 'Title']:
+                            title_prop = props.get(title_key, {})
+                            if title_prop.get('title') and len(title_prop['title']) > 0:
+                                title = title_prop['title'][0]['text']['content']
+                                break
 
-                    # 讀取標籤（相容 multi_select 和 rich_text）
-                    topics = []
-                    topic_prop = props.get('Topic', {})
-                    if topic_prop.get('type') == 'multi_select':
-                        topics = [tag.get('name', '') for tag in topic_prop.get('multi_select', [])]
-                    elif topic_prop.get('type') == 'rich_text' and topic_prop.get('rich_text'):
-                        topics_str = topic_prop['rich_text'][0]['text']['content']
-                        topics = [t.strip() for t in topics_str.split(',') if t.strip()]
+                        # 讀取摘要
+                        summary = ''
+                        summary_prop = props.get('Summary', {})
+                        if summary_prop.get('rich_text') and len(summary_prop['rich_text']) > 0:
+                            summary = summary_prop['rich_text'][0]['text']['content']
 
-                    # 讀取 URL
-                    url_obj = props.get('URL', {})
-                    url = url_obj.get('url') if url_obj else ''
+                        # 讀取標籤（相容 multi_select 和 rich_text）
+                        topics = []
+                        topic_prop = props.get('Topic', {})
+                        if topic_prop.get('type') == 'multi_select':
+                            topics = [tag.get('name', '') for tag in topic_prop.get('multi_select', [])]
+                        elif topic_prop.get('type') == 'rich_text' and topic_prop.get('rich_text'):
+                            topics_str = topic_prop['rich_text'][0]['text']['content']
+                            topics = [t.strip() for t in topics_str.split(',') if t.strip()]
 
-                    # 讀取發布日期
-                    published_date = ''
-                    pub_date_prop = props.get('Published Date', {})
-                    if pub_date_prop.get('type') == 'date' and pub_date_prop.get('date'):
-                        published_date = pub_date_prop['date'].get('start', '')
-                    elif pub_date_prop.get('type') == 'rich_text' and pub_date_prop.get('rich_text'):
-                        published_date = pub_date_prop['rich_text'][0]['text']['content']
+                        # 讀取 URL
+                        url_obj = props.get('URL', {})
+                        url = url_obj.get('url') if url_obj else ''
 
-                    # 讀取抓取日期
-                    fetched_date = ''
-                    fetch_date_prop = props.get('Fetched Date', {})
-                    if fetch_date_prop.get('type') == 'date' and fetch_date_prop.get('date'):
-                        fetched_date = fetch_date_prop['date'].get('start', '')
-                    elif fetch_date_prop.get('type') == 'rich_text' and fetch_date_prop.get('rich_text'):
-                        fetched_date = fetch_date_prop['rich_text'][0]['text']['content']
+                        # 讀取發布日期
+                        published_date = ''
+                        pub_date_prop = props.get('Published Date', {})
+                        if pub_date_prop.get('type') == 'date' and pub_date_prop.get('date'):
+                            published_date = pub_date_prop['date'].get('start', '')
+                        elif pub_date_prop.get('type') == 'rich_text' and pub_date_prop.get('rich_text'):
+                            published_date = pub_date_prop['rich_text'][0]['text']['content']
 
-                    # 讀取狀態（相容大小寫）
-                    status = '待處理'
-                    for status_key in ['status', 'Status']:
-                        status_prop = props.get(status_key, {})
-                        if status_prop.get('type') == 'select' and status_prop.get('select'):
-                            status = status_prop['select'].get('name', '待處理')
-                            break
-                        elif status_prop.get('type') == 'status' and status_prop.get('status'):
-                            status = status_prop['status'].get('name', '待處理')
-                            break
+                        # 讀取抓取日期
+                        fetched_date = ''
+                        fetch_date_prop = props.get('Fetched Date', {})
+                        if fetch_date_prop.get('type') == 'date' and fetch_date_prop.get('date'):
+                            fetched_date = fetch_date_prop['date'].get('start', '')
+                        elif fetch_date_prop.get('type') == 'rich_text' and fetch_date_prop.get('rich_text'):
+                            fetched_date = fetch_date_prop['rich_text'][0]['text']['content']
 
-                    articles.append({
-                        'id': page.get('id', ''),
-                        'title': title,
-                        'summary': summary,
-                        'topics': topics,
-                        'url': url,
-                        'published_date': published_date,
-                        'fetched_date': fetched_date,
-                        'source': source_name,
-                        'status': status
-                    })
+                        # 讀取狀態（相容大小寫）
+                        status = '待處理'
+                        for status_key in ['status', 'Status']:
+                            status_prop = props.get(status_key, {})
+                            if status_prop.get('type') == 'select' and status_prop.get('select'):
+                                status = status_prop['select'].get('name', '待處理')
+                                break
+                            elif status_prop.get('type') == 'status' and status_prop.get('status'):
+                                status = status_prop['status'].get('name', '待處理')
+                                break
 
-                except Exception as e:
-                    print(f"處理單一文章失敗: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    continue
+                        articles.append({
+                            'id': page.get('id', ''),
+                            'title': title,
+                            'summary': summary,
+                            'topics': topics,
+                            'url': url,
+                            'published_date': published_date,
+                            'fetched_date': fetched_date,
+                            'source': source_name,
+                            'status': status
+                        })
+
+                    except Exception as e:
+                        print(f"處理單一文章失敗: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        continue
 
             return articles
 
