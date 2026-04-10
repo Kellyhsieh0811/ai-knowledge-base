@@ -338,6 +338,12 @@ def perform_fetch_process():
                         dt_parsed = datetime(*entry.published_parsed[:6])
                         dt_utc = dt_parsed.replace(tzinfo=pytz.UTC)
                         pub_date = dt_utc.astimezone(pytz.timezone('Asia/Taipei')).isoformat()
+
+                        # ✅ 超過 30 天的文章直接跳過，不寫入
+                        age_days = (datetime.now(pytz.UTC) - dt_utc).days
+                        if age_days > 30:
+                            print(f"    [Skip] 文章超過 30 天（{age_days} 天前）: {en_title[:40]}")
+                            continue
                     else:
                         pub_date = datetime.now(pytz.timezone('Asia/Taipei')).isoformat()
 
