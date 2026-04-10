@@ -499,10 +499,28 @@ def list_articles():
 
         print(f"✅ 過濾後: {len(valid_articles)} 篇")
 
-        valid_articles.sort(
-            key=lambda x: x.get('fetched_date') or x.get('published_date', ''),
-            reverse=True
-        )
+        def parse_date_for_sort(article):
+            """將各種日期格式統一轉為 datetime 供排序使用"""
+            from datetime import datetime
+            date_str = article.get('fetched_date') or article.get('published_date', '')
+            if not date_str:
+                return datetime.min
+            # ISO 格式
+            try:
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            except:
+                pass
+            # 中文格式：2026年2月11日
+            import re
+            m = re.search(r'(\d+)年(\d+)月(\d+)日', date_str)
+            if m:
+                try:
+                    return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                except:
+                    pass
+            return datetime.min
+
+        valid_articles.sort(key=parse_date_for_sort, reverse=True)
         valid_articles = valid_articles[:20]
 
         if valid_articles:
