@@ -1549,11 +1549,11 @@
                 return dateB - dateA;
             });
 
-            // 只顯示本週文章（用 fetched_date 判斷，沒有則用 publish_date）
+            // 只顯示本週文章（用 published_date 判斷，沒有則用 fetched_date）
             const thisWeekArticles = displayArticles.filter(article => {
-                const fetchedDate = article.fetched_date || article.publish_date;
-                const d = parseArticleDate(fetchedDate);
-                if (!d) return true; // 沒日期的保留
+                const dateToCheck = article.publish_date || article.fetched_date;
+                const d = parseArticleDate(dateToCheck);
+                if (!d) return false; // 沒日期的不顯示
                 return d >= weekStart;
             });
 
