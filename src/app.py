@@ -16,6 +16,7 @@ import feedparser
 import re
 from html import unescape
 import traceback
+import signal
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
@@ -191,6 +192,7 @@ def scrape_bnext():
         print(f"Scrape Bnext error: {e}")
         return []
 
+<<<<<<< HEAD
 # ─────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────
@@ -253,6 +255,22 @@ def fetch_status():
 
 def perform_fetch_process():
     """背景可重用的抓取流程"""
+=======
+def timeout_handler(signum, frame):
+    raise Exception("WORKER TIMEOUT: Fetch process exceeded 25 seconds")
+
+def perform_fetch_process():
+    """Wrapper to enforce 25-second timeout on fetch process"""
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(25)
+    try:
+        return _perform_fetch_process_internal()
+    finally:
+        signal.alarm(0)
+
+def _perform_fetch_process_internal():
+    """Core logic to fetch and process articles"""
+>>>>>>> 0917904 (feat(fetch): 強化爬蟲穩定性與優化 Notion 排序)
     notion_manager = NotionService()
     ai_service = AIService()
 
@@ -303,7 +321,8 @@ def perform_fetch_process():
 
             filter_type = 'ai_hr' if ('bnext.com.tw' in url or 'oxford-review' in url) else 'hr'
 
-            for j, entry in enumerate(feed.entries[:10], 1):
+            max_entries = 3 if ('josh' in url.lower() or 'joshbersin' in url.lower()) else 10
+            for j, entry in enumerate(feed.entries[:max_entries], 1):
                 if time.time() - source_start_time > 30:
                     print(f"    ⚠️ 來源 {name} 超過 30 秒，強制跳出")
                     break
@@ -590,6 +609,380 @@ def ai_rewrite():
     content = ai_service.rewrite_for_social(article_data, platform, style)
     return jsonify({'content': content})
 
+<<<<<<< HEAD
+=======
+@app.route('/api/notion/update-ai-content', methods=['POST'])
+def update_ai_content():
+    data = request.json
+    service = NotionService()
+    
+    resp = service.update_article_ai_content(
+        data.get('article_id'),
+        data.get('ai_content'),
+        data.get('platform')
+    )
+    
+    if resp:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'error': 'Notion update failed'}), 500
+
+@app.route('/api/sources', methods=['GET'])
+def get_sources():
+    """讀取所有 RSS 來源"""
+    try:
+        service = NotionService()
+        sources = service.get_all_sources()  # Includes active and inactive
+        return jsonify({
+            'success': True,
+            'sources': sources
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/sources', methods=['POST'])
+def add_source():
+    """新增 RSS 來源到 Notion DB1"""
+    try:
+        data = request.json
+        service = NotionService()
+        
+        # Determine platform and active status
+        platform = data.get('platform', '新聞媒體')
+        is_active = data.get('is_active', True)
+        
+        # Call create_source with unpacked arguments
+        source_id = service.create_source(
+            name=data['name'],
+            url=data['url'],
+            platform=platform,
+            is_active=is_active
+        )
+        
+        if source_id:
+            return jsonify({
+                'success': True,
+                'source_id': source_id
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Notion creation returned None'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/sources/<source_id>', methods=['PATCH'])
+def update_source(source_id):
+    """更新來源（例如啟用/停用）"""
+    try:
+        data = request.json
+        service = NotionService()
+        service.update_source(source_id, data)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/sources/<source_id>', methods=['DELETE'])
+def delete_source(source_id):
+    """刪除來源"""
+    try:
+        service = NotionService()
+        print(f"嘗試刪除來源 ID: {source_id}")
+        service.delete_source(source_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"刪除來源失敗: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Updated Fetch Logic (Issue 1 Fix)
+@app.route('/api/rss/fetch', methods=['POST'])
+@app.route('/api/articles/fetch', methods=['POST']) # Alias for user's request
+@limiter.limit("10 per hour") # 對抓取 API 設定較嚴格的速率限制，防止資源濫用
+def fetch_articles():
+    """Wrapper to enforce 25-second timeout on user requested fetch logic"""
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(25)
+    try:
+        return _fetch_articles_internal()
+    finally:
+        signal.alarm(0)
+
+def _fetch_articles_internal():
+    """抓取 RSS 並處理 (User Requested Logic)"""
+    notion_manager = NotionService() # Alias for user's naming
+    ai_service = AIService()
+    
+    try:
+        print("\n" + "=" * 50)
+        print("開始抓取 RSS 文章")
+        print("=" * 50)
+        
+        # 備援來源清單（Notion 無法連線時使用）
+        FALLBACK_SOURCES = [
+            {'id': 'josh', 'name': 'Josh Bersin (HR Tech)', 'url': 'https://joshbersin.com/feed/', 'platform': 'HR媒體'},
+            {'id': 'hbr_hr', 'name': 'HBR Human Resource Management', 'url': 'http://feeds.feedburner.com/harvardbusiness', 'platform': 'HBR'},
+            {'id': 'mit', 'name': 'MIT Sloan Management Review', 'url': 'https://sloanreview.mit.edu/feed/', 'platform': 'MIT Sloan'},
+            {'id': 'cw', 'name': '天下雜誌', 'url': 'https://www.cw.com.tw/RSS/cw_content.xml', 'platform': '天下雜誌'},
+            {'id': 'bnext', 'name': '數位時代', 'url': 'https://www.bnext.com.tw/', 'platform': '數位時代'},
+        ]
+
+        # 1. 嘗試從 Notion DB1 讀取 RSS 來源，失敗時用備援清單
+        sources = notion_manager.get_active_feeds()
+
+        if not sources:
+            print("⚠️  Notion RSS DB 無法存取，改用備援來源清單")
+            sources = FALLBACK_SOURCES
+
+        print(f"找到 {len(sources)} 個啟用的來源")
+        
+        all_articles = []
+        errors = []
+        
+        # for frontend cache
+        all_articles_for_display = load_articles()
+        existing_urls = {a.get('source_url') for a in all_articles_for_display}
+        
+        # 2. 逐一處理每個來源
+        for i, source in enumerate(sources, 1):
+            try:
+                source_start_time = time.time()
+                print(f"\n[{i}/{len(sources)}] 處理來源: {source.get('name', 'Unknown')}")
+                print(f"    URL: {source.get('url')}")
+                
+                # 抓取 RSS
+                url = source['url']
+                if 'bnext.com.tw' in url:
+                    print(f"  > 使用 BeautifulSoup 抓取 Bnext 來源: {url}")
+                    entries = scrape_bnext()
+                    if not entries:
+                        continue
+                    class DummyFeed:
+                        pass
+                    feed = DummyFeed()
+                    feed.entries = entries
+                else:
+                    feed = feedparser.parse(url)
+                
+                if getattr(feed, 'entries', None) is None or not feed.entries:
+                    print(f"  ⚠ 沒有找到文章")
+                    continue
+                
+                print(f"  ✓ 找到 {len(feed.entries)} 篇文章")
+                
+                max_entries = 3 if ('josh' in url.lower() or 'joshbersin' in url.lower()) else 10
+                for j, entry in enumerate(feed.entries[:max_entries], 1):
+                    if time.time() - source_start_time > 30:
+                        print(f"    ⚠️ 處理來源 {source.get('name', 'Unknown')} 超過 30 秒，強制跳出保護 worker")
+                        break
+
+                    try:
+                        # 先查是否在 Notion 中
+                        art_url = entry.link
+                        try:
+                            existing_id = notion_manager.check_article_exists(art_url)
+                            if existing_id:
+                                print(f"    [{j}] 文章已存在 Notion，更新抓取日期")
+                                notion_manager.update_article_fetched_date(existing_id)
+                                existing_urls.add(art_url)
+                                continue
+                        except Exception:
+                            pass
+
+                        if art_url in existing_urls:
+                            print(f"    [{j}] 跳過（本地已存在）")
+                            continue
+
+                        print(f"    [{j}] 處理文章...")
+                        en_title = entry.title
+                        raw_summary = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
+                        en_summary = clean_html_content(raw_summary)[:800]
+
+                        current_filter_type = 'ai_hr' if ('bnext.com.tw' in url or 'oxford-review' in url) else 'hr'
+                        if not is_hr_or_ai_related(en_title, en_summary, filter_type=current_filter_type):
+                            print(f"    [Skip] 不符合主題: {en_title}")
+                            continue
+
+                        if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                            dt_parsed = datetime(*entry.published_parsed[:6])
+                            dt_utc = dt_parsed.replace(tzinfo=pytz.UTC)
+                            pub_date = dt_utc.astimezone(pytz.timezone('Asia/Taipei')).isoformat()
+                        else:
+                            pub_date = datetime.now(pytz.timezone('Asia/Taipei')).isoformat()
+
+                        print(f"        翻譯中...")
+                        zh_title = ai_service.translate_to_chinese(en_title, "標題")
+                        zh_summary = ai_service.translate_to_chinese(en_summary, "摘要")
+                        print(f"        中文標題: {zh_title[:30]}...")
+
+                        print(f"        提取標籤...")
+                        topics = ai_service.extract_topics(en_title, en_summary)
+                        print(f"        標籤: {', '.join(topics)}")
+
+                        article_data = {
+                            'id': f"local_{int(time.time()*1000)}",
+                            'title': zh_title,
+                            'summary': zh_summary,
+                            'topics': topics,
+                            'url': art_url,
+                            'published_date': pub_date,
+                            'source': source.get('name', ''),
+                            'status': '待處理',
+                            'source_platform': source.get('platform', '新聞媒體'),
+                            'source_url': art_url,
+                            'ai_content': ''
+                        }
+
+                        # 嘗試寫入 Notion，失敗時沿用本地 ID
+                        try:
+                            resp = notion_manager.create_article(article_data, source.get('id'))
+                            if resp:
+                                article_data['id'] = resp['id']
+                                print(f"        ✅ 已寫入 Notion")
+                            else:
+                                print(f"        ⚠️  Notion 寫入失敗，存本地快取")
+                        except Exception:
+                            print(f"        ⚠️  Notion 不可用，存本地快取")
+
+                        all_articles.append(article_data)
+                        if art_url not in existing_urls:
+                            all_articles_for_display.insert(0, article_data)
+                            existing_urls.add(art_url)
+
+                        time.sleep(0.5)
+
+                    except Exception as e:
+                        error_msg = f"處理文章失敗: {str(e)}"
+                        print(f"      ❌ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+
+                # 嘗試更新 Notion 時間戳（失敗時略過）
+                try:
+                    notion_manager.update_feed_timestamp(source['id'])
+                except Exception:
+                    pass
+                
+            except Exception as e:
+                error_msg = f"處理來源 {source.get('name')} 失敗: {str(e)}"
+                print(f"  ❌ {error_msg}")
+                errors.append(error_msg)
+                continue
+        
+        print("\n" + "=" * 50)
+        print(f"抓取完成！成功: {len(all_articles)} 篇")
+        if errors:
+            print(f"錯誤: {len(errors)} 個")
+        print("=" * 50)
+        
+        # Save cache
+        save_articles(all_articles_for_display)
+        
+        return jsonify({
+            'success': True,
+            'status': 'success',
+            'articles_processed': len(all_articles),
+            'message': f'成功處理 {len(all_articles)} 篇新文章',
+            'errors': errors if errors else None,
+            'articles': all_articles_for_display
+        })
+        
+    except Exception as e:
+        print(f"\n❌ 抓取流程錯誤: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'error': str(e),
+            'message': str(e)
+        }), 500
+
+@app.route('/api/articles', methods=['GET'])
+def list_articles():
+    """獲取文章列表，只返回有效的 HR 文章 (Synced with Notion)"""
+    try:
+        service = NotionService()
+        
+        # ✅ 允許的標籤清單 (Whitelist) — 含 Notion 中帶括號的變體
+        allowed_tags = {
+            # 標準標籤
+            '人力資源科技', '人才管理', '員工體驗', '領導力發展',
+            '多元共融', '職場文化', '薪酬福利', '績效管理',
+            '學習發展', '人力規劃', '員工敬業度', '變革管理',
+            '人工智慧', '數位轉型', '未來工作', '遠距工作', '員工福祉',
+            # Notion 中的帶括號變體
+            '人工智慧 (AI)', '多元共融 (DEI)', '人力資源科技 (HR Tech)',
+            '未來工作 (Future of Work)'
+        }
+        
+        # 從 Notion 獲取所有文章
+        print("🔄 API Request: Fetching articles from Notion...")
+        all_articles = service.get_articles()
+        print(f"✅ Notion 回傳: {len(all_articles)} 篇")
+        
+        # 過濾文章
+        valid_articles = []
+        for article in all_articles:
+            # 檢查標籤
+            topics = article.get('topics', [])
+            # 無標籤文章：直接放行（不嚴格過濾）
+            if not topics:
+                valid_articles.append(article)
+                continue
+                
+            # 必須有至少一個允許的標籤
+            has_valid_tag = any(tag in allowed_tags for tag in topics)
+            
+            # 再次檢查標題關鍵字 (Double Insurance)
+            blocked_keywords = ['102歲', '醫美', '黃金', '去美元化', '市場拓展']
+            has_blocked = any(k in article.get('title', '') for k in blocked_keywords)
+            
+            if has_valid_tag and not has_blocked:
+                # 確保格式與前端一致
+                if 'id' not in article:
+                    article['id'] = str(int(time.time()))
+                valid_articles.append(article)
+        
+        print(f"✅ 過濾後: {len(valid_articles)} 篇")
+        
+        # 1. 依照 Fetched Date 降序排列 (防呆機制：若無 fetched_date 則退回 published_date 處理)
+        valid_articles.sort(key=lambda x: x.get('fetched_date') or x.get('published_date', ''), reverse=True)
+        
+        # 2. 只取前 20 筆
+        valid_articles = valid_articles[:20]
+        
+        # ⚠️ 只有在有結果時才更新快取，避免空資料蓋掉本地快取
+        if valid_articles:
+            save_articles(valid_articles)
+        else:
+            print("⚠️ 過濾結果為空，保留本地快取不覆蓋")
+            return jsonify(load_articles())
+        
+        return jsonify(valid_articles)
+        
+    except Exception as e:
+        print(f"❌ Error fetching articles: {e}")
+        # Fallback to cache if Notion fails
+        return jsonify(load_articles())
+
+>>>>>>> 0917904 (feat(fetch): 強化爬蟲穩定性與優化 Notion 排序)
 @app.route('/api/generate-content', methods=['POST'])
 def generate_content():
     try:
