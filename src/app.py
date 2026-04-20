@@ -1,3 +1,7 @@
+import jwt
+from datetime import datetime, timedelta
+from functools import wraps
+from flask_cors import CORS
 import sys
 import os
 print(f"LOADING APP FROM: {__file__}")
@@ -23,10 +27,17 @@ from flask_talisman import Talisman
 from flask_cors import CORS
 
 app = Flask(__name__, template_folder='../templates', static_folder='../static')
+# 啟用 CORS
+CORS(app)
+
+# 權限設定
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'demo2026')
+SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-change-in-production')
+
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
-CORS(app)
+
 
 talisman = Talisman(
     app,
@@ -192,10 +203,79 @@ def scrape_bnext():
         print(f"Scrape Bnext error: {e}")
         return []
 
-<<<<<<< HEAD
 # ─────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────
+
+
+# ==================== 權限控管 ====================
+
+@app.route('/api/auth/login', methods=['POST'])
+def admin_login():
+    try:
+        from flask import request, jsonify
+        data = request.json
+        password = data.get('password', '')
+        
+        if password != ADMIN_PASSWORD:
+            return jsonify({
+                'success': False,
+                'error': '密碼錯誤'
+            }), 401
+        
+        # 生成 JWT token (8 小時有效)
+        token = jwt.encode({
+            'role': 'admin',
+            'exp': datetime.utcnow() + timedelta(hours=8)
+        }, SECRET_KEY, algorithm='HS256')
+        
+        return jsonify({
+            'success': True,
+            'token': token,
+            'message': '登入成功'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def require_admin(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        from flask import request, jsonify
+        auth_header = request.headers.get('Authorization', '')
+        
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                'success': False,
+                'error': '需要管理員權限'
+            }), 403
+        
+        token = auth_header[7:]
+        
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            if payload.get('role') != 'admin':
+                return jsonify({
+                    'success': False,
+                    'error': '權限不足'
+                }), 403
+        except jwt.ExpiredSignatureError:
+            return jsonify({
+                'success': False,
+                'error': 'Token 已過期，請重新登入'
+            }), 401
+        except:
+            return jsonify({
+                'success': False,
+                'error': 'Token 無效'
+            }), 401
+        
+        return f(*args, **kwargs)
+    
+    return decorated
 
 @app.route('/')
 def index():
@@ -255,22 +335,6 @@ def fetch_status():
 
 def perform_fetch_process():
     """背景可重用的抓取流程"""
-=======
-def timeout_handler(signum, frame):
-    raise Exception("WORKER TIMEOUT: Fetch process exceeded 25 seconds")
-
-def perform_fetch_process():
-    """Wrapper to enforce 25-second timeout on fetch process"""
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(25)
-    try:
-        return _perform_fetch_process_internal()
-    finally:
-        signal.alarm(0)
-
-def _perform_fetch_process_internal():
-    """Core logic to fetch and process articles"""
->>>>>>> 0917904 (feat(fetch): 強化爬蟲穩定性與優化 Notion 排序)
     notion_manager = NotionService()
     ai_service = AIService()
 
@@ -451,29 +515,7 @@ scheduler.add_job(
 # RSS Fetch Route（前端按鈕觸發）
 # ─────────────────────────────────────────────
 
-@app.route('/api/rss/fetch', methods=['POST'])
-@app.route('/api/articles/fetch', methods=['POST'])
-@limiter.limit("10 per hour")
-def fetch_articles():
-    try:
-        result = perform_fetch_process()
-        save_fetch_time('manual')
-        return jsonify({
-            'success': True,
-            'status': 'success',
-            'articles_processed': result['processed'],
-            'message': f"成功處理 {result['processed']} 篇新文章",
-            'errors': result.get('errors') or None
-        })
-    except Exception as e:
-        print(f"\n❌ 抓取流程錯誤: {e}")
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'status': 'error',
-            'error': str(e),
-            'message': str(e)
-        }), 500
+
 
 @app.route('/api/fetch', methods=['POST'])
 def manual_fetch():
@@ -483,82 +525,6 @@ def manual_fetch():
         return jsonify({'success': True, 'time': datetime.now().isoformat(), 'details': result})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-# ─────────────────────────────────────────────
-# Articles
-# ─────────────────────────────────────────────
-
-@app.route('/api/articles', methods=['GET'])
-def list_articles():
-    try:
-        service = NotionService()
-
-        allowed_tags = {
-            '人力資源科技', '人才管理', '員工體驗', '領導力發展',
-            '多元共融', '職場文化', '薪酬福利', '績效管理',
-            '學習發展', '人力規劃', '員工敬業度', '變革管理',
-            '人工智慧', '數位轉型', '未來工作', '遠距工作', '員工福祉',
-            '人工智慧 (AI)', '多元共融 (DEI)', '人力資源科技 (HR Tech)',
-            '未來工作 (Future of Work)'
-        }
-
-        print("🔄 Fetching articles from Notion...")
-        all_articles = service.get_articles()
-        print(f"✅ Notion 回傳: {len(all_articles)} 篇")
-
-        valid_articles = []
-        for article in all_articles:
-            topics = article.get('topics', [])
-            if not topics:
-                valid_articles.append(article)
-                continue
-
-            has_valid_tag = any(tag in allowed_tags for tag in topics)
-            blocked_keywords = ['102歲', '醫美', '黃金', '去美元化', '市場拓展']
-            has_blocked = any(k in article.get('title', '') for k in blocked_keywords)
-
-            if has_valid_tag and not has_blocked:
-                if 'id' not in article:
-                    article['id'] = str(int(time.time()))
-                valid_articles.append(article)
-
-        print(f"✅ 過濾後: {len(valid_articles)} 篇")
-
-        def parse_date_for_sort(article):
-            """將各種日期格式統一轉為 datetime 供排序使用"""
-            from datetime import datetime
-            date_str = article.get('fetched_date') or article.get('published_date', '')
-            if not date_str:
-                return datetime.min
-            # ISO 格式
-            try:
-                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            except:
-                pass
-            # 中文格式：2026年2月11日
-            import re
-            m = re.search(r'(\d+)年(\d+)月(\d+)日', date_str)
-            if m:
-                try:
-                    return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-                except:
-                    pass
-            return datetime.min
-
-        valid_articles.sort(key=parse_date_for_sort, reverse=True)
-        valid_articles = valid_articles[:20]
-
-        if valid_articles:
-            save_articles(valid_articles)
-        else:
-            print("⚠️ 過濾結果為空，保留本地快取")
-            return jsonify(load_articles())
-
-        return jsonify(valid_articles)
-
-    except Exception as e:
-        print(f"❌ Error fetching articles: {e}")
-        return jsonify(load_articles())
 
 # ─────────────────────────────────────────────
 # AI Routes
@@ -582,6 +548,7 @@ def ai_extract_topics():
     return jsonify({'topics': topics})
 
 @app.route('/api/ai/rewrite', methods=['POST'])
+@require_admin
 def ai_rewrite():
     data = request.json
     article_id = data.get('article_id')
@@ -605,115 +572,11 @@ def ai_rewrite():
             article_data['topics'] = [t['name'] for t in tags]
     else:
         article_data = data.get('article', {})
-
-    content = ai_service.rewrite_for_social(article_data, platform, style)
-    return jsonify({'content': content})
-
-<<<<<<< HEAD
-=======
-@app.route('/api/notion/update-ai-content', methods=['POST'])
-def update_ai_content():
-    data = request.json
-    service = NotionService()
-    
-    resp = service.update_article_ai_content(
-        data.get('article_id'),
-        data.get('ai_content'),
-        data.get('platform')
-    )
-    
-    if resp:
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'error': 'Notion update failed'}), 500
-
-@app.route('/api/sources', methods=['GET'])
-def get_sources():
-    """讀取所有 RSS 來源"""
-    try:
-        service = NotionService()
-        sources = service.get_all_sources()  # Includes active and inactive
-        return jsonify({
-            'success': True,
-            'sources': sources
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/sources', methods=['POST'])
-def add_source():
-    """新增 RSS 來源到 Notion DB1"""
-    try:
-        data = request.json
-        service = NotionService()
-        
-        # Determine platform and active status
-        platform = data.get('platform', '新聞媒體')
-        is_active = data.get('is_active', True)
-        
-        # Call create_source with unpacked arguments
-        source_id = service.create_source(
-            name=data['name'],
-            url=data['url'],
-            platform=platform,
-            is_active=is_active
-        )
-        
-        if source_id:
-            return jsonify({
-                'success': True,
-                'source_id': source_id
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Notion creation returned None'
-            }), 500
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/sources/<source_id>', methods=['PATCH'])
-def update_source(source_id):
-    """更新來源（例如啟用/停用）"""
-    try:
-        data = request.json
-        service = NotionService()
-        service.update_source(source_id, data)
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/sources/<source_id>', methods=['DELETE'])
-def delete_source(source_id):
-    """刪除來源"""
-    try:
-        service = NotionService()
-        print(f"嘗試刪除來源 ID: {source_id}")
-        service.delete_source(source_id)
-        return jsonify({'success': True})
-    except Exception as e:
-        print(f"刪除來源失敗: {e}")
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
 # Updated Fetch Logic (Issue 1 Fix)
 @app.route('/api/rss/fetch', methods=['POST'])
 @app.route('/api/articles/fetch', methods=['POST']) # Alias for user's request
 @limiter.limit("10 per hour") # 對抓取 API 設定較嚴格的速率限制，防止資源濫用
+@require_admin
 def fetch_articles():
     """Wrapper to enforce 25-second timeout on user requested fetch logic"""
     signal.signal(signal.SIGALRM, timeout_handler)
@@ -982,7 +845,6 @@ def list_articles():
         # Fallback to cache if Notion fails
         return jsonify(load_articles())
 
->>>>>>> 0917904 (feat(fetch): 強化爬蟲穩定性與優化 Notion 排序)
 @app.route('/api/generate-content', methods=['POST'])
 def generate_content():
     try:
@@ -1100,6 +962,7 @@ def get_sources():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/sources', methods=['POST'])
+@require_admin
 def add_source():
     try:
         data = request.json
@@ -1127,6 +990,7 @@ def update_source(source_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/sources/<source_id>', methods=['DELETE'])
+@require_admin
 def delete_source(source_id):
     try:
         service = NotionService()

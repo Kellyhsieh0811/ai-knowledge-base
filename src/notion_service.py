@@ -345,11 +345,6 @@ class NotionService:
     def get_articles(self, filters=None):
         """從 Notion Database 2 讀取文章"""
         try:
-<<<<<<< HEAD
-            # 不在 Notion 端排序（因為 Published Date / Fetched Date 是 rich_text，Notion 無法正確排序）
-            # 改由 Python 端排序
-            payload = {}
-=======
             # Sort by Fetched Date desc
             payload = {
                 "sorts": [
@@ -362,7 +357,6 @@ class NotionService:
 
             response = self._request(
                 "POST", f"databases/{self._format_uuid(self.content_db_id)}/query", payload)
->>>>>>> 0917904 (feat(fetch): 強化爬蟲穩定性與優化 Notion 排序)
 
             articles = []
             has_more = True
