@@ -407,14 +407,8 @@ class NotionService:
                         if summary_prop.get('rich_text') and len(summary_prop['rich_text']) > 0:
                             summary = summary_prop['rich_text'][0]['text']['content']
 
-                        # 讀取標籤（相容 multi_select 和 rich_text）
-                        topics = []
-                        topic_prop = props.get('Topic', {})
-                        if topic_prop.get('type') == 'multi_select':
-                            topics = [tag.get('name', '') for tag in topic_prop.get('multi_select', [])]
-                        elif topic_prop.get('type') == 'rich_text' and topic_prop.get('rich_text'):
-                            topics_str = topic_prop['rich_text'][0]['text']['content']
-                            topics = [t.strip() for t in topics_str.split(',') if t.strip()]
+                        # 讀取標籤（multi_select）
+                        topics = [item['name'] for item in props.get('Topic', {}).get('multi_select', [])]
 
                         # 讀取 URL
                         url_obj = props.get('URL', {})
