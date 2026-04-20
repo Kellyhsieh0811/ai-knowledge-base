@@ -786,6 +786,10 @@
             border-left-color: #10b981;
         }
 
+        .notification.info {
+            border-left-color: #3b82f6;
+        }
+
         @keyframes slideIn {
             from {
                 transform: translateX(400px);
@@ -1116,19 +1120,25 @@
         let adminToken = null;
 
         function loadInitialData() {
+            console.log('🚀 初始化頁面...');
+            
+            // 檢查登入狀態
             adminToken = sessionStorage.getItem('admin_token');
             
             if (adminToken) {
+                console.log('✅ 已登入');
                 demoMode = false;
                 removeDemoBanner();
             } else {
+                console.log('👁️ 展示模式');
                 demoMode = true;
                 showDemoBanner();
             }
             
             updateUIPermissions();
-            loadSources();
             loadArticles();
+            loadRSSSources();
+            setupFilters();
         }
 
         function showDemoBanner() {
@@ -1263,9 +1273,7 @@
 
         // Initial Load
         document.addEventListener('DOMContentLoaded', () => {
-            loadArticles();
-            loadRSSSources();  // 載入 RSS 來源列表
-            setupFilters();
+            loadInitialData();
         });
 
         // Toggle RSS Section
@@ -1302,14 +1310,22 @@
             try {
                 const response = await fetchWithAuth('/api/rss/fetch', { method: 'POST' });
                 const data = await response.json();
-                if (data.success) {
+                
+                if (response.status === 504 || (data.message && data.message.includes('timed out'))) {
+                    showNotification('⏳ 抓取任務已在背景執行，稍後即可重新載入頁面查看結果！', 'info');
+                } else if (data.success) {
                     showNotification(`✅ ${data.message || '抓取完成'}`, 'success');
                     loadArticles(); // 重新載入文章列表
                 } else {
                     showNotification(`❌ 抓取失敗：${data.message || data.error || '未知錯誤'}`, 'error');
                 }
             } catch (err) {
-                showNotification(`❌ 連線錯誤：${err.message}`, 'error');
+                // 如果是其他連線錯誤或是 Parse JSON 錯誤 (例如 Nginx/Vercel 返回的 504 HTML)
+                if (err.message && err.message.includes('504')) {
+                    showNotification('⏳ 抓取任務已在背景執行，請稍後重新整理頁面查看結果', 'info');
+                } else {
+                    showNotification(`❌ 連線錯誤：${err.message}`, 'error');
+                }
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -1692,14 +1708,6 @@
                     (article.title || '').includes(keyword)
                 );
                 if (hasBlockedKeyword) return false;
-
-                if (!article.keywords || article.keywords.length === 0) return true;
-
-                const hasValidTag = article.keywords.some(tag => allowedTags.includes(tag));
-                if (!hasValidTag) {
-                    console.log(`⚠️ 過濾無效標籤文章: ${article.title}`);
-                    return false;
-                }
                 return true;
             });
 
@@ -1710,16 +1718,7 @@
                 return dateB - dateA;
             });
 
-            // 只顯示本週文章（用 published_date 判斷，沒有則用 fetched_date）
-            const thisWeekArticles = displayArticles.filter(article => {
-                const dateToCheck = article.publish_date || article.fetched_date;
-                const d = parseArticleDate(dateToCheck);
-                if (!d) return false; // 沒日期的不顯示
-                return d >= weekStart;
-            });
-
-            // 如果本週完全沒有文章，顯示空狀態
-            const finalArticles = thisWeekArticles;
+            const finalArticles = displayArticles;
 
             const countEl = document.getElementById('total-count');
             if (countEl) countEl.textContent = finalArticles.length;
@@ -2296,6 +2295,45 @@
         }
         // Initialize
         // 初始化由上方 DOMContentLoaded 事件處理，此處不需重複呼叫
+        
+        // ==================== 強制初始化 ====================
+        (function() {
+            console.log('🔧 強制初始化腳本載入');
+            
+            // 移除舊的事件監聽器
+            const oldListeners = document.querySelectorAll('script');
+            console.log('📜 現有腳本數量:', oldListeners.length);
+            
+            // 註冊新的初始化
+            if (document.readyState === 'loading') {
+                console.log('⏳ DOM 尚未載入，註冊事件監聽器');
+                document.addEventListener('DOMContentLoaded', initializePage);
+            } else {
+                console.log('✅ DOM 已載入，立即執行初始化');
+                initializePage();
+            }
+            
+            function initializePage() {
+                console.log('🚀 開始初始化頁面...');
+                console.log('檢查函數:', {
+                    loadInitialData: typeof loadInitialData,
+                    showDemoBanner: typeof showDemoBanner,
+                    updateUIPermissions: typeof updateUIPermissions
+                });
+                
+                if (typeof loadInitialData === 'function') {
+                    console.log('✅ loadInitialData 存在，執行中...');
+                    loadInitialData();
+                } else {
+                    console.error('❌ loadInitialData 不存在！');
+                    // 強制顯示橫幅
+                    if (typeof showDemoBanner === 'function') {
+                        console.log('⚠️ 直接呼叫 showDemoBanner');
+                        showDemoBanner();
+                    }
+                }
+            }
+        })();
     </script>
 </body>
 
