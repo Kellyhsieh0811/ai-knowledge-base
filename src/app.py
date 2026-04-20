@@ -21,6 +21,7 @@ import re
 from html import unescape
 import traceback
 import signal
+import concurrent.futures
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
@@ -54,6 +55,10 @@ limiter = Limiter(
 
 app.config['JSON_AS_ASCII'] = False
 app.json.ensure_ascii = False
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 DATA_FILE = 'articles_data.json'
 
@@ -134,7 +139,17 @@ def is_hr_or_ai_related(title, summary, filter_type='hr'):
 
     elif filter_type == 'ai_hr':
         has_hr = any(kw in content for kw in hr_core)
-        has_ai_work = any(kw in content for kw in ai_work_keywords)
+        has_ai_work = False
+        import re
+        for kw in ai_work_keywords:
+            if '.*' in kw:
+                if re.search(kw, content):
+                    has_ai_work = True
+                    break
+            else:
+                if kw in content:
+                    has_ai_work = True
+                    break
         # AI 來源：必須同時有 AI 工作關鍵字 + HR 核心關鍵字
         # 或者直接有 HR 核心關鍵字也可以
         return has_hr or (has_ai_work and ('work' in content or '工作' in content or '員工' in content))
@@ -573,18 +588,28 @@ def ai_rewrite():
     else:
         article_data = data.get('article', {})
 # Updated Fetch Logic (Issue 1 Fix)
+def timeout_handler(signum, frame):
+    raise TimeoutError("Fetch operation timed out after 25 seconds")
+
 @app.route('/api/rss/fetch', methods=['POST'])
 @app.route('/api/articles/fetch', methods=['POST']) # Alias for user's request
 @limiter.limit("10 per hour") # 對抓取 API 設定較嚴格的速率限制，防止資源濫用
 @require_admin
 def fetch_articles():
     """Wrapper to enforce 25-second timeout on user requested fetch logic"""
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(25)
-    try:
-        return _fetch_articles_internal()
-    finally:
-        signal.alarm(0)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_fetch_articles_internal)
+        try:
+            result = future.result(timeout=120)
+            if isinstance(result, tuple):
+                return jsonify(result[0]), result[1]
+            return jsonify(result)
+        except concurrent.futures.TimeoutError:
+            print("❌ 手動抓取超時 (25秒)")
+            return jsonify({'success': False, 'message': 'Fetch operation timed out after 25 seconds'}), 504
+        except Exception as e:
+            print(f"❌ 手動抓取失敗: {str(e)}")
+            return jsonify({'success': False, 'message': str(e)}), 500
 
 def _fetch_articles_internal():
     """抓取 RSS 並處理 (User Requested Logic)"""
@@ -756,26 +781,26 @@ def _fetch_articles_internal():
         # Save cache
         save_articles(all_articles_for_display)
         
-        return jsonify({
+        return {
             'success': True,
             'status': 'success',
             'articles_processed': len(all_articles),
             'message': f'成功處理 {len(all_articles)} 篇新文章',
             'errors': errors if errors else None,
             'articles': all_articles_for_display
-        })
+        }
         
     except Exception as e:
         print(f"\n❌ 抓取流程錯誤: {e}")
         import traceback
         traceback.print_exc()
         
-        return jsonify({
+        return {
             'success': False,
             'status': 'error',
             'error': str(e),
             'message': str(e)
-        }), 500
+        }, 500
 
 @app.route('/api/articles', methods=['GET'])
 def list_articles():

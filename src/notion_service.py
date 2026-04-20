@@ -148,7 +148,7 @@ class NotionService:
                 "rich_text": [{"text": {"content": summary[:2000]}}]
             },
             "Topic": {
-                "rich_text": [{"text": {"content": ", ".join(article_data.get('topics', []))}}]
+                "multi_select": [{"name": topic[:100]} for topic in article_data.get('topics', [])]
             },
             "Source": {
                 "select": {"name": article_data.get('source', 'Unknown')}
