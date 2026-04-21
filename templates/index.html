@@ -896,7 +896,7 @@
 
             <!-- Buttons -->
             <div style="display: flex; gap: 12px;">
-                <button onclick="showRSSManager()"
+                <button id="rss-manage-btn" onclick="showRSSManager()"
                     style="padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                     ⚙️ RSS 管理
                 </button>
@@ -909,7 +909,7 @@
 
         <!-- RSS Management Section -->
         <!-- RSS 來源管理區域 -->
-        <div
+        <div id="rss-section"
             style="background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3 style="margin: 0; font-size: 18px; color: #111827;">📡 RSS 來源管理</h3>
@@ -1231,18 +1231,20 @@
         }
 
         function updateUIPermissions() {
-            const isAdmin    = userRole === 'admin';
-            const isEmployee = userRole === 'employee';
-            const canManage  = isAdmin;                    // 管理員：完整功能
-            const canFetch   = isAdmin || isEmployee;      // 員工以上：可抓取/翻譯
+            const role       = userRole;
+            const isAdmin    = role === 'admin';
+            const isEmployee = role === 'employee';
+            const canManage  = isAdmin;               // 管理員：RSS管理、新增來源
+            const canFetch   = isAdmin || isEmployee; // 員工以上：抓取文章、AI重製
 
-            document.querySelectorAll('.delete-source-btn').forEach(btn => {
-                btn.style.display = canManage ? 'inline-block' : 'none';
-            });
-            const addBtn   = document.getElementById('add-source-btn');
-            const fetchBtn = document.getElementById('fetch-articles-btn');
-            if (addBtn)   addBtn.style.display   = canManage ? 'inline-block' : 'none';
-            if (fetchBtn) fetchBtn.style.display = canFetch  ? 'inline-block' : 'none';
+            console.log('updateUIPermissions role:', role, { canManage, canFetch });
+
+            const show = (el, visible) => { if (el) el.style.display = visible ? '' : 'none'; };
+
+            show(document.getElementById('rss-manage-btn'), canManage);
+            show(document.getElementById('rss-section'),    canManage);
+            show(document.getElementById('fetch-btn'),      canFetch);
+            show(document.getElementById('rewrite-btn'),    canFetch);
         }
 
         // 帶 token 的 API 請求
