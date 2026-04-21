@@ -1404,8 +1404,10 @@
 
         function parseArticleDate(dateString) {
             if (!dateString || dateString === 'undefined') return null;
-            // ISO 格式（含時區，如 2026-04-20T17:05:00+08:00）
-            const d = new Date(dateString);
+            // 截斷微秒（6位小數）為毫秒（3位），避免 JS Date 解析失敗
+            // 例：2026-04-20T17:45:47.890413+08:00 → 2026-04-20T17:45:47.890+08:00
+            const normalized = dateString.replace(/(\.\d{3})\d+/, '$1');
+            const d = new Date(normalized);
             if (!isNaN(d.getTime())) return d;
             // 中文格式：2026年04月20日 下午5:05 (GMT+8)
             const m = dateString.match(/(\d+)年(\d+)月(\d+)日/);
@@ -1425,12 +1427,15 @@
 
         function filterThisWeekArticles(articles) {
             const weekStart = getThisWeekStart();
+            console.log('本週一:', weekStart.toISOString());
             return articles.filter(article => {
                 if (!article.keywords || article.keywords.length === 0) return false;
                 if (!article.fetched_date) return false;
                 const fetchedDate = parseArticleDate(article.fetched_date);
                 if (!fetchedDate) return false;
-                return fetchedDate >= weekStart;
+                const isThisWeek = fetchedDate >= weekStart;
+                console.log(`${article.title.substring(0,20)} | ${article.fetched_date.substring(0,10)} | 本週:${isThisWeek}`);
+                return isThisWeek;
             });
         }
 
