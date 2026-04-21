@@ -2300,47 +2300,7 @@
                 alert('驗證失敗：' + error.message);
             }
         }
-        // Initialize
-        // 初始化由上方 DOMContentLoaded 事件處理，此處不需重複呼叫
-        
-        // ==================== 強制初始化 ====================
-        (function() {
-            console.log('🔧 強制初始化腳本載入');
-            
-            // 移除舊的事件監聽器
-            const oldListeners = document.querySelectorAll('script');
-            console.log('📜 現有腳本數量:', oldListeners.length);
-            
-            // 註冊新的初始化
-            if (document.readyState === 'loading') {
-                console.log('⏳ DOM 尚未載入，註冊事件監聽器');
-                document.addEventListener('DOMContentLoaded', initializePage);
-            } else {
-                console.log('✅ DOM 已載入，立即執行初始化');
-                initializePage();
-            }
-            
-            function initializePage() {
-                console.log('🚀 開始初始化頁面...');
-                console.log('檢查函數:', {
-                    loadInitialData: typeof loadInitialData,
-                    showDemoBanner: typeof showDemoBanner,
-                    updateUIPermissions: typeof updateUIPermissions
-                });
-                
-                if (typeof loadInitialData === 'function') {
-                    console.log('✅ loadInitialData 存在，執行中...');
-                    loadInitialData();
-                } else {
-                    console.error('❌ loadInitialData 不存在！');
-                    // 強制顯示橫幅
-                    if (typeof showDemoBanner === 'function') {
-                        console.log('⚠️ 直接呼叫 showDemoBanner');
-                        showDemoBanner();
-                    }
-                }
-            }
-        })();
+        // Initialize — handled by DOMContentLoaded above
     </script>
 </body>
 
