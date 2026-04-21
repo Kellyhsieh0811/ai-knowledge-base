@@ -1782,7 +1782,8 @@
                                 <h3 class="article-title">${article.title}</h3>
                                 <p class="article-excerpt">${article.summary}</p>
                                 <div class="article-meta">
-                                    <span>📅 ${formatDate(article.publish_date)}</span>
+                                    <span>📅 發布：${formatDate(article.publish_date)}</span>
+                                    <span>🔄 抓取：${formatDate(article.fetched_date)}</span>
                                 </div>
                                 <div class="article-keywords">
                                     ${article.keywords.slice(0, 3).map(kw => `
