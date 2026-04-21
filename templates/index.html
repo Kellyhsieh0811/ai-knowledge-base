@@ -1717,15 +1717,23 @@
 
             const initialArticles = filteredArticles.length > 0 ? filteredArticles : (document.getElementById('search-input').value ? [] : articles);
 
+            // 強制過濾：只渲染本週的文章
+            const weekStart = getThisWeekStart();
+            const thisWeekOnly = initialArticles.filter(article => {
+                if (!article.keywords || article.keywords.length === 0) return false;
+                if (!article.fetched_date) return false;
+                const fetchedDate = parseArticleDate(article.fetched_date);
+                if (!fetchedDate) return false;
+                return fetchedDate >= weekStart;
+            });
+            console.log(`renderArticles: 收到 ${initialArticles.length} 篇，強制過濾後 ${thisWeekOnly.length} 篇`);
+
             // 按日期排序（最新在前）
-            const sorted = [...initialArticles].sort((a, b) => {
+            const finalArticles = [...thisWeekOnly].sort((a, b) => {
                 const dateA = parseArticleDate(a.publish_date);
                 const dateB = parseArticleDate(b.publish_date);
                 return dateB - dateA;
             });
-
-            // 過濾本週文章（有標籤 + fetched_date 在本週）
-            const finalArticles = filterThisWeekArticles(sorted);
 
             const countEl = document.getElementById('total-count');
             if (countEl) countEl.textContent = finalArticles.length;
