@@ -1427,7 +1427,9 @@
 
         function filterThisWeekArticles(articles) {
             const weekStart = getThisWeekStart();
-            console.log('本週一:', weekStart.toISOString());
+            const pad = n => String(n).padStart(2, '0');
+            const ws = weekStart;
+            console.log(`本週一: ${ws.getFullYear()}-${pad(ws.getMonth()+1)}-${pad(ws.getDate())} 00:00:00 (local)`);
             return articles.filter(article => {
                 if (!article.keywords || article.keywords.length === 0) return false;
                 if (!article.fetched_date) return false;
