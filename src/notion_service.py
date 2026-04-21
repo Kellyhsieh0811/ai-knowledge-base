@@ -345,14 +345,14 @@ class NotionService:
     def get_articles(self, filters=None):
         """從 Notion Database 2 讀取文章"""
         try:
-            # Sort by Fetched Date desc
             payload = {
                 "sorts": [
                     {
                         "property": "Fetched Date",
                         "direction": "descending"
                     }
-                ]
+                ],
+                "page_size": 100
             }
 
             response = self._request(

@@ -853,8 +853,8 @@ def list_articles():
         # 1. 依照 Fetched Date 降序排列 (防呆機制：若無 fetched_date 則退回 published_date 處理)
         valid_articles.sort(key=lambda x: x.get('fetched_date') or x.get('published_date', ''), reverse=True)
         
-        # 2. 只取前 20 筆
-        valid_articles = valid_articles[:20]
+        # 2. 只取前 100 筆
+        valid_articles = valid_articles[:100]
         
         # ⚠️ 只有在有結果時才更新快取，避免空資料蓋掉本地快取
         if valid_articles:
