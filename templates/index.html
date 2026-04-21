@@ -1404,13 +1404,34 @@
 
         function parseArticleDate(dateString) {
             if (!dateString || dateString === 'undefined') return null;
-            // ISO 格式
+            // ISO 格式（含時區，如 2026-04-20T17:05:00+08:00）
             const d = new Date(dateString);
             if (!isNaN(d.getTime())) return d;
-            // 中文格式：2026年2月11日
+            // 中文格式：2026年04月20日 下午5:05 (GMT+8)
             const m = dateString.match(/(\d+)年(\d+)月(\d+)日/);
             if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
             return null;
+        }
+
+        function getThisWeekStart() {
+            const today = new Date();
+            const dayOfWeek = today.getDay(); // 0=週日, 1=週一, ..., 6=週六
+            const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - daysToMonday);
+            weekStart.setHours(0, 0, 0, 0);
+            return weekStart;
+        }
+
+        function filterThisWeekArticles(articles) {
+            const weekStart = getThisWeekStart();
+            return articles.filter(article => {
+                if (!article.keywords || article.keywords.length === 0) return false;
+                if (!article.fetched_date) return false;
+                const fetchedDate = parseArticleDate(article.fetched_date);
+                if (!fetchedDate) return false;
+                return fetchedDate >= weekStart;
+            });
         }
 
         function formatDate(dateString) {
@@ -1679,46 +1700,17 @@
             const container = document.getElementById('articles-container');
             if (!container) return;
 
-            // ✅ 允許的標籤清單 (Whitelist)
-            const allowedTags = [
-                '人力資源科技', '人才管理', '員工體驗', '領導力發展',
-                '多元共融', '職場文化', '薪酬福利', '績效管理',
-                '學習發展', '人力規劃', '員工敬業度', '變革管理',
-                '人工智慧', '數位轉型', '未來工作', '遠距工作', '員工福祉'
-            ];
-
-            // ❌ 禁止的關鍵字 (Blacklist)
-            const blockedKeywords = [
-                '102歲', '醫美', '黃金', '去美元化', '待處理',
-                '市場拓展', '品牌管理', '供應鏈', '股票', '期貨', '投資'
-            ];
-
-            // 本週起始時間（週一 00:00）
-            const now = new Date();
-            const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1; // 週一=0
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - dayOfWeek);
-            weekStart.setHours(0, 0, 0, 0);
-
             const initialArticles = filteredArticles.length > 0 ? filteredArticles : (document.getElementById('search-input').value ? [] : articles);
 
-            // 先過濾內容
-            let displayArticles = initialArticles.filter(article => {
-                const hasBlockedKeyword = blockedKeywords.some(keyword =>
-                    (article.title || '').includes(keyword)
-                );
-                if (hasBlockedKeyword) return false;
-                return true;
-            });
-
             // 按日期排序（最新在前）
-            displayArticles.sort((a, b) => {
+            const sorted = [...initialArticles].sort((a, b) => {
                 const dateA = parseArticleDate(a.publish_date);
                 const dateB = parseArticleDate(b.publish_date);
                 return dateB - dateA;
             });
 
-            const finalArticles = displayArticles;
+            // 過濾本週文章（有標籤 + fetched_date 在本週）
+            const finalArticles = filterThisWeekArticles(sorted);
 
             const countEl = document.getElementById('total-count');
             if (countEl) countEl.textContent = finalArticles.length;
