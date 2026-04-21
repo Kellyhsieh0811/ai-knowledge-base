@@ -1126,32 +1126,75 @@
             if (banner) banner.remove();
         }
 
-        async function promptAdminLogin() {
-            const password = prompt('請輸入管理員密碼：');
+        function promptAdminLogin() {
+            // 避免重複建立
+            if (document.getElementById('login-modal')) return;
+
+            const modal = document.createElement('div');
+            modal.id = 'login-modal';
+            modal.style.cssText = `
+                position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+                display: flex; align-items: center; justify-content: center; z-index: 9999;
+            `;
+            modal.innerHTML = `
+                <div style="background:#fff; border-radius:12px; padding:2rem; width:320px; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+                    <h3 style="margin:0 0 1rem; font-size:1.1rem;">🔓 員工登入</h3>
+                    <input
+                        type="password"
+                        id="login-password-input"
+                        placeholder="請輸入管理員密碼"
+                        style="width:100%; padding:0.6rem 0.75rem; border:1px solid #d1d5db; border-radius:8px; font-size:0.95rem; box-sizing:border-box; margin-bottom:0.5rem;"
+                    />
+                    <div id="login-error" style="color:#ef4444; font-size:0.85rem; min-height:1.2em; margin-bottom:0.75rem;"></div>
+                    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                        <button onclick="closeLoginModal()" style="padding:0.5rem 1rem; border:1px solid #d1d5db; border-radius:8px; background:#fff; cursor:pointer;">取消</button>
+                        <button onclick="submitAdminLogin()" style="padding:0.5rem 1rem; border:none; border-radius:8px; background:#6366f1; color:#fff; cursor:pointer;">登入</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            const input = document.getElementById('login-password-input');
+            input.focus();
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') submitAdminLogin(); });
+            modal.addEventListener('click', e => { if (e.target === modal) closeLoginModal(); });
+        }
+
+        function closeLoginModal() {
+            const modal = document.getElementById('login-modal');
+            if (modal) modal.remove();
+        }
+
+        async function submitAdminLogin() {
+            const input = document.getElementById('login-password-input');
+            const password = input ? input.value : '';
             if (!password) return;
-            
+
+            const errorEl = document.getElementById('login-error');
+
             try {
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({password})
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     adminToken = data.token;
                     sessionStorage.setItem('admin_token', data.token);
                     demoMode = false;
-                    
+                    closeLoginModal();
                     removeDemoBanner();
                     updateUIPermissions();
                     showNotification('✅ 登入成功', 'success');
                 } else {
-                    showNotification('❌ ' + (data.error || '密碼錯誤'), 'error');
+                    if (errorEl) errorEl.textContent = '❌ ' + (data.error || '密碼錯誤，請重試');
+                    if (input) { input.value = ''; input.focus(); }
                 }
             } catch (error) {
-                showNotification('❌ 登入失敗', 'error');
+                if (errorEl) errorEl.textContent = '❌ 登入失敗，請稍後再試';
             }
         }
 
@@ -1504,6 +1547,10 @@
                 return fetchedDate >= weekStart;
             });
             console.log(`renderArticles: 收到 ${initialArticles.length} 篇，強制過濾後 ${thisWeekOnly.length} 篇`);
+            console.log('=== 收到的文章的 fetched_date ===');
+            initialArticles.forEach((article, index) => {
+                console.log(`${index + 1}. ${article.title.substring(0, 30)}... | ${article.fetched_date}`);
+            });
 
             // 按日期排序（最新在前）
             const finalArticles = [...thisWeekOnly].sort((a, b) => {
