@@ -1082,15 +1082,16 @@
 
         let demoMode = true;
         let adminToken = null;
+        let userRole = null; // 'admin' | 'employee' | 'guest' | null
 
         function loadInitialData() {
             console.log('🚀 初始化頁面...');
-            
-            // 檢查登入狀態
+
             adminToken = sessionStorage.getItem('admin_token');
-            
+            userRole   = sessionStorage.getItem('user_role');
+
             if (adminToken) {
-                console.log('✅ 已登入');
+                console.log('✅ 已登入:', userRole);
                 demoMode = false;
                 removeDemoBanner();
             } else {
@@ -1098,7 +1099,7 @@
                 demoMode = true;
                 showDemoBanner();
             }
-            
+
             updateUIPermissions();
             loadArticles();
             loadRSSSources();
@@ -1127,24 +1128,28 @@
         }
 
         function promptAdminLogin() {
-            // 避免重複建立
             if (document.getElementById('login-modal')) return;
+
+            let selectedRole = 'admin';
+            const roleLabels = { admin: '管理員密碼：', employee: '員工密碼：', guest: '訪客密碼：' };
 
             const modal = document.createElement('div');
             modal.id = 'login-modal';
             modal.style.cssText = `
-                position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-                display: flex; align-items: center; justify-content: center; z-index: 9999;
+                position:fixed; inset:0; background:rgba(0,0,0,0.5);
+                display:flex; align-items:center; justify-content:center; z-index:9999;
             `;
             modal.innerHTML = `
-                <div style="background:#fff; border-radius:12px; padding:2rem; width:320px; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
-                    <h3 style="margin:0 0 1rem; font-size:1.1rem;">🔓 員工登入</h3>
-                    <input
-                        type="password"
-                        id="login-password-input"
-                        placeholder="請輸入管理員密碼"
-                        style="width:100%; padding:0.6rem 0.75rem; border:1px solid #d1d5db; border-radius:8px; font-size:0.95rem; box-sizing:border-box; margin-bottom:0.5rem;"
-                    />
+                <div style="background:#fff; border-radius:12px; padding:2rem; width:360px; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+                    <h3 style="margin:0 0 1.25rem; font-size:1.1rem;">🔓 請選擇登入身份</h3>
+                    <div id="role-tabs" style="display:flex; gap:8px; margin-bottom:1.25rem;">
+                        <button class="role-tab active" data-role="admin"  style="flex:1; padding:10px 6px; border:2px solid #6366f1; background:#6366f1; color:#fff; border-radius:8px; cursor:pointer; font-size:0.85rem;">👑 管理員</button>
+                        <button class="role-tab"        data-role="employee" style="flex:1; padding:10px 6px; border:2px solid #e5e7eb; background:#fff; border-radius:8px; cursor:pointer; font-size:0.85rem;">👔 內部員工</button>
+                        <button class="role-tab"        data-role="guest"    style="flex:1; padding:10px 6px; border:2px solid #e5e7eb; background:#fff; border-radius:8px; cursor:pointer; font-size:0.85rem;">👤 外部用戶</button>
+                    </div>
+                    <label id="role-label" style="font-size:0.9rem; color:#374151; display:block; margin-bottom:6px;">管理員密碼：</label>
+                    <input type="password" id="login-password-input" placeholder="請輸入密碼"
+                        style="width:100%; padding:0.6rem 0.75rem; border:1px solid #d1d5db; border-radius:8px; font-size:0.95rem; box-sizing:border-box; margin-bottom:0.5rem;" />
                     <div id="login-error" style="color:#ef4444; font-size:0.85rem; min-height:1.2em; margin-bottom:0.75rem;"></div>
                     <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
                         <button onclick="closeLoginModal()" style="padding:0.5rem 1rem; border:1px solid #d1d5db; border-radius:8px; background:#fff; cursor:pointer;">取消</button>
@@ -1154,10 +1159,30 @@
             `;
             document.body.appendChild(modal);
 
+            // Role tab switching
+            modal.querySelectorAll('.role-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    selectedRole = tab.dataset.role;
+                    modal.querySelectorAll('.role-tab').forEach(t => {
+                        const active = t === tab;
+                        t.style.background = active ? '#6366f1' : '#fff';
+                        t.style.color      = active ? '#fff'    : '#374151';
+                        t.style.borderColor = active ? '#6366f1' : '#e5e7eb';
+                    });
+                    document.getElementById('role-label').textContent = roleLabels[selectedRole];
+                    document.getElementById('login-password-input').value = '';
+                    document.getElementById('login-error').textContent = '';
+                    document.getElementById('login-password-input').focus();
+                });
+            });
+
             const input = document.getElementById('login-password-input');
             input.focus();
             input.addEventListener('keydown', e => { if (e.key === 'Enter') submitAdminLogin(); });
             modal.addEventListener('click', e => { if (e.target === modal) closeLoginModal(); });
+
+            // Expose selectedRole to submitAdminLogin via closure on modal element
+            modal._getRole = () => selectedRole;
         }
 
         function closeLoginModal() {
@@ -1166,29 +1191,36 @@
         }
 
         async function submitAdminLogin() {
+            const modal = document.getElementById('login-modal');
+            const role  = modal ? modal._getRole() : 'admin';
             const input = document.getElementById('login-password-input');
             const password = input ? input.value : '';
-            if (!password) return;
+            const errorEl  = document.getElementById('login-error');
 
-            const errorEl = document.getElementById('login-error');
+            if (!password) {
+                if (errorEl) errorEl.textContent = '❌ 請輸入密碼';
+                return;
+            }
 
             try {
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({password})
+                    body: JSON.stringify({ role, password })
                 });
-
                 const data = await response.json();
 
                 if (data.success) {
                     adminToken = data.token;
+                    userRole   = data.role;
                     sessionStorage.setItem('admin_token', data.token);
+                    sessionStorage.setItem('user_role',   data.role);
                     demoMode = false;
                     closeLoginModal();
                     removeDemoBanner();
                     updateUIPermissions();
-                    showNotification('✅ 登入成功', 'success');
+                    const roleNames = { admin: '管理員', employee: '員工', guest: '訪客' };
+                    showNotification(`✅ ${roleNames[data.role] || data.role}登入成功`, 'success');
                 } else {
                     if (errorEl) errorEl.textContent = '❌ ' + (data.error || '密碼錯誤，請重試');
                     if (input) { input.value = ''; input.focus(); }
@@ -1199,18 +1231,18 @@
         }
 
         function updateUIPermissions() {
-            // 隱藏/顯示刪除按鈕
+            const isAdmin    = userRole === 'admin';
+            const isEmployee = userRole === 'employee';
+            const canManage  = isAdmin;                    // 管理員：完整功能
+            const canFetch   = isAdmin || isEmployee;      // 員工以上：可抓取/翻譯
+
             document.querySelectorAll('.delete-source-btn').forEach(btn => {
-                btn.style.display = demoMode ? 'none' : 'inline-block';
+                btn.style.display = canManage ? 'inline-block' : 'none';
             });
-            
-            // 隱藏/顯示新增來源按鈕
-            const addBtn = document.getElementById('add-source-btn');
-            if (addBtn) addBtn.style.display = demoMode ? 'none' : 'inline-block';
-            
-            // 隱藏/顯示抓取文章按鈕
+            const addBtn   = document.getElementById('add-source-btn');
             const fetchBtn = document.getElementById('fetch-articles-btn');
-            if (fetchBtn) fetchBtn.style.display = demoMode ? 'none' : 'inline-block';
+            if (addBtn)   addBtn.style.display   = canManage ? 'inline-block' : 'none';
+            if (fetchBtn) fetchBtn.style.display = canFetch  ? 'inline-block' : 'none';
         }
 
         // 帶 token 的 API 請求

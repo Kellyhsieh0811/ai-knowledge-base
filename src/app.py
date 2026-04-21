@@ -32,8 +32,12 @@ app = Flask(__name__, template_folder='../templates', static_folder='../static')
 CORS(app)
 
 # 權限設定
-ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'demo2026')
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-change-in-production')
+ROLE_PASSWORDS = {
+    'admin':    os.getenv('ADMIN_PASSWORD',    'admin2026'),
+    'employee': os.getenv('EMPLOYEE_PASSWORD', 'employee2026'),
+    'guest':    os.getenv('GUEST_PASSWORD',    'guest2026'),
+}
 
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
@@ -228,33 +232,25 @@ def scrape_bnext():
 @app.route('/api/auth/login', methods=['POST'])
 def admin_login():
     try:
-        from flask import request, jsonify
         data = request.json
+        role = data.get('role', 'admin')
         password = data.get('password', '')
-        
-        if password != ADMIN_PASSWORD:
-            return jsonify({
-                'success': False,
-                'error': '密碼錯誤'
-            }), 401
-        
-        # 生成 JWT token (8 小時有效)
+
+        if role not in ROLE_PASSWORDS:
+            return jsonify({'success': False, 'error': '無效的身份'}), 400
+
+        if password != ROLE_PASSWORDS[role]:
+            return jsonify({'success': False, 'error': '密碼錯誤'}), 401
+
         token = jwt.encode({
-            'role': 'admin',
+            'role': role,
             'exp': datetime.utcnow() + timedelta(hours=8)
         }, SECRET_KEY, algorithm='HS256')
-        
-        return jsonify({
-            'success': True,
-            'token': token,
-            'message': '登入成功'
-        })
-        
+
+        return jsonify({'success': True, 'token': token, 'role': role})
+
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 def require_admin(f):
     @wraps(f)
