@@ -252,6 +252,24 @@ def admin_login():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+def require_login(f):
+    """Allow any authenticated role (admin / employee / guest)."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'error': '請先登入'}), 401
+        token = auth_header[7:]
+        try:
+            jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            return jsonify({'success': False, 'error': 'Token 已過期，請重新登入'}), 401
+        except Exception:
+            return jsonify({'success': False, 'error': 'Token 無效'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
 def require_admin(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -590,7 +608,7 @@ def timeout_handler(signum, frame):
 @app.route('/api/rss/fetch', methods=['POST'])
 @app.route('/api/articles/fetch', methods=['POST']) # Alias for user's request
 @limiter.limit("10 per hour") # 對抓取 API 設定較嚴格的速率限制，防止資源濫用
-@require_admin
+@require_login
 def fetch_articles():
     """Wrapper to enforce 25-second timeout on user requested fetch logic"""
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
