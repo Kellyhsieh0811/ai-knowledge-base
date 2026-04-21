@@ -1231,20 +1231,19 @@
         }
 
         function updateUIPermissions() {
-            const role       = userRole;
-            const isAdmin    = role === 'admin';
-            const isEmployee = role === 'employee';
-            const canManage  = isAdmin;               // 管理員：RSS管理、新增來源
-            const canFetch   = isAdmin || isEmployee; // 員工以上：抓取文章、AI重製
+            const role      = userRole;
+            const canManage = role === 'admin';               // 管理員：RSS管理
+            const canRewrite = role === 'admin' || role === 'employee'; // 員工以上：AI重製
+            // 抓取文章：所有已登入身份皆可，未登入時由 demoMode 控制
 
-            console.log('updateUIPermissions role:', role, { canManage, canFetch });
+            console.log('updateUIPermissions role:', role, { canManage, canRewrite });
 
             const show = (el, visible) => { if (el) el.style.display = visible ? '' : 'none'; };
 
             show(document.getElementById('rss-manage-btn'), canManage);
             show(document.getElementById('rss-section'),    canManage);
-            show(document.getElementById('fetch-btn'),      canFetch);
-            show(document.getElementById('rewrite-btn'),    canFetch);
+            show(document.getElementById('rewrite-btn'),    canRewrite);
+            // fetch-btn: 不做控制，所有人可見
         }
 
         // 帶 token 的 API 請求
