@@ -270,6 +270,26 @@ def require_login(f):
     return decorated
 
 
+def require_employee(f):
+    """Allow admin or employee roles; return 403 for guest or unauthenticated."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'error': '請先登入'}), 401
+        token = auth_header[7:]
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            if payload.get('role') not in ('admin', 'employee'):
+                return jsonify({'success': False, 'error': '權限不足，需要員工或管理員身份'}), 403
+        except jwt.ExpiredSignatureError:
+            return jsonify({'success': False, 'error': 'Token 已過期，請重新登入'}), 401
+        except Exception:
+            return jsonify({'success': False, 'error': 'Token 無效'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
 def require_admin(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -577,7 +597,7 @@ def ai_extract_topics():
     return jsonify({'topics': topics})
 
 @app.route('/api/ai/rewrite', methods=['POST'])
-@require_admin
+@require_employee
 def ai_rewrite():
     data = request.json
     article_id = data.get('article_id')
@@ -885,6 +905,7 @@ def list_articles():
         return jsonify(load_articles())
 
 @app.route('/api/generate-content', methods=['POST'])
+@require_employee
 def generate_content():
     try:
         data = request.json
