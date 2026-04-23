@@ -27,7 +27,8 @@ from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
 from flask_cors import CORS
 
-app = Flask(__name__, template_folder='../templates', static_folder='../static')
+_base = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+app = Flask(__name__, template_folder=os.path.join(_base, 'templates'), static_folder=os.path.join(_base, 'static'))
 # 啟用 CORS
 CORS(app)
 
