@@ -23,12 +23,11 @@ def fetch_feed(url: str, platform_name: str) -> List[Dict]:
     try:
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-        content = response.content
+        feed = feedparser.parse(response.content)
     except Exception as e:
         print(f"Failed to fetch URL {url}: {e}")
-        return []
-
-    feed = feedparser.parse(content)
+        print(f"Falling back to feedparser.parse({url})")
+        feed = feedparser.parse(url)
     articles = []
     
     if not feed.entries:
